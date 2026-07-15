@@ -3,7 +3,7 @@ import { DomainError, validateWorkspaceRoute } from "@/lib/domain";
 import { loadWorkspaceSnapshot } from "@/lib/repository";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { chatGPTSignInPath } from "./chatgpt-auth";
+import { chatGPTSignInPath } from "./chatgpt-auth-paths";
 import type { AppRoute } from "./components/app-shell";
 import { HarborApp } from "./components/harbor-app";
 
