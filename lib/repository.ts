@@ -383,6 +383,14 @@ async function itemFileKeys(itemId: string): Promise<string[]> {
   return rows.map((row) => row.r2_key);
 }
 
+async function projectFileKeys(projectId: string): Promise<string[]> {
+  const rows = await all<{ r2_key: string }>(
+    "SELECT r2_key FROM file_objects WHERE project_id = ?",
+    projectId,
+  );
+  return rows.map((row) => row.r2_key);
+}
+
 async function collectionFileKeys(collectionId: string): Promise<string[]> {
   const rows = await all<{ r2_key: string }>(
     `SELECT fo.r2_key FROM file_objects fo
@@ -416,6 +424,7 @@ export async function listMutationFileKeys(
   mutation: WorkspaceMutation,
 ): Promise<string[]> {
   if (
+    mutation.action !== "delete_project" &&
     mutation.action !== "delete_collection" &&
     mutation.action !== "delete_item" &&
     mutation.action !== "delete_payment"
@@ -425,6 +434,10 @@ export async function listMutationFileKeys(
 
   await ensurePreviewSchema();
   const user = await syncUser(identity);
+  if (mutation.action === "delete_project") {
+    await requireProjectOwner(user.id, mutation.projectId);
+    return projectFileKeys(mutation.projectId);
+  }
   if (mutation.action === "delete_collection") {
     const projectId = await projectForCollection(mutation.collectionId);
     await requireProjectAccess(user.id, projectId);
@@ -732,6 +745,12 @@ export async function applyWorkspaceMutation(
         optionalText(mutation.description, 1_000),
         mutation.projectId,
       );
+      break;
+    }
+    case "delete_project": {
+      await requireProjectOwner(user.id, mutation.projectId);
+      await run("DELETE FROM file_objects WHERE project_id = ?", mutation.projectId);
+      await run("DELETE FROM projects WHERE id = ?", mutation.projectId);
       break;
     }
     case "invite_member": {

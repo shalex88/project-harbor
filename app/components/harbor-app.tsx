@@ -625,6 +625,8 @@ function successMessage(mutation: WorkspaceMutation): string {
       return "Project created";
     case "update_project":
       return "Project updated";
+    case "delete_project":
+      return "Project deleted";
     case "invite_member":
       return "Invitation saved";
     case "remove_member":

@@ -38,6 +38,23 @@ test("task mutations reject removed priority and assignee fields", () => {
   );
 });
 
+
+test("project deletion accepts only a project id", () => {
+  assert.deepEqual(parseMutation({ action: "delete_project", projectId: "project-1" }), {
+    action: "delete_project",
+    projectId: "project-1",
+  });
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "delete_project",
+        projectId: "project-1",
+        name: "Unexpected",
+      }),
+    /unsupported field/i,
+  );
+});
+
 test("events reject task workflow fields", () => {
   assert.throws(
     () =>

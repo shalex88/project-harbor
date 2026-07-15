@@ -13,6 +13,7 @@ import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from ".
 
 type DialogState =
   | { kind: "project" }
+  | { kind: "project-delete" }
   | { kind: "invite" }
   | { kind: "collection-create" }
   | { kind: "collection-edit"; collection: CollectionRecord }
@@ -78,6 +79,11 @@ export function ProjectWorkspace({
       name: String(data.get("name") ?? ""),
       description: String(data.get("description") ?? ""),
     });
+    setDialog(null);
+  };
+
+  const deleteProject = async () => {
+    await onMutate({ action: "delete_project", projectId });
     setDialog(null);
   };
 
@@ -261,6 +267,23 @@ export function ProjectWorkspace({
           <Field label="Description"><textarea name="description" defaultValue={project.description} maxLength={1000} /></Field>
           <FormActions submitLabel="Save project" pending={pending} onCancel={() => setDialog(null)} />
         </SubmitForm>
+        {canManageMembers ? (
+          <div className="danger-zone">
+            <div>
+              <h3>Delete project</h3>
+              <p>Remove this project, including all collections, tasks, events, files, payments, and member access.</p>
+            </div>
+            <button className="button button-danger" type="button" onClick={() => setDialog({ kind: "project-delete" })}>Delete project</button>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal open={dialog?.kind === "project-delete"} title="Delete project" description="This permanently removes the project and everything in it." onClose={() => setDialog(null)} size="small">
+        <p className="confirmation-copy">Delete <strong>{project.name}</strong>? This cannot be undone.</p>
+        <div className="form-actions">
+          <button className="button button-secondary" type="button" onClick={() => setDialog(null)}>Cancel</button>
+          <button className="button button-danger" type="button" disabled={pending} onClick={deleteProject}>Delete project</button>
+        </div>
       </Modal>
 
       <Modal open={dialog?.kind === "invite"} title="Invite member" description="They will join automatically when the same email signs in." onClose={() => setDialog(null)} size="small">

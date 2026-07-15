@@ -59,6 +59,12 @@ export function parseMutation(input: unknown): WorkspaceMutation {
         name: requireText(value.name, "Project name", 120),
         description: optionalText(value.description, 1_000),
       };
+    case "delete_project":
+      rejectUnknown(value, ["projectId"]);
+      return {
+        action,
+        projectId: id(value.projectId, "Project"),
+      };
     case "invite_member":
       rejectUnknown(value, ["projectId", "email"]);
       return {

@@ -22,6 +22,8 @@ const storage = await readFile(
 test("destructive workspace mutations collect and remove attached objects", () => {
   assert.match(repository, /listMutationFileKeys/);
   assert.match(repository, /DELETE FROM file_objects WHERE id IN/);
+  assert.match(repository, /delete_project/);
+  assert.match(repository, /projectFileKeys/);
   assert.match(workspaceRoute, /deleteObjectsBestEffort/);
   assert.match(storage, /Promise\.allSettled/);
   assert.match(storage, /attempt < 2/);
