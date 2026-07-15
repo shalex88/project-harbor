@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { chatGPTSignOutPath } from "@/app/chatgpt-auth";
+import { chatGPTSignOutPath } from "@/app/chatgpt-auth-paths";
 import type { AppUser, ProjectRecord } from "@/lib/domain";
 import { Sheet } from "./ui";
 
