@@ -141,6 +141,7 @@ export type WorkspaceMutation =
       name: string;
       description?: string;
     }
+  | { action: "delete_project"; projectId: string }
   | { action: "invite_member"; projectId: string; email: string }
   | { action: "remove_member"; projectId: string; userId: string }
   | {
