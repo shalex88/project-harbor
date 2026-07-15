@@ -9,6 +9,35 @@ pinned files, and comparing estimated costs with recorded payments.
 - Node.js `>=22.13.0`
 - Linux with `flock`, `curl`, and GNU `timeout`
 
+## Run Locally
+
+### UI preview
+
+Install the locked dependencies, then start the development server:
+
+```bash
+npm run install:ci
+npm run dev
+```
+
+Open the local URL printed by Vite (normally `http://localhost:5173`).
+
+### Local data
+
+To run the application with its local D1 database and R2 storage bindings,
+apply the checked-in D1 migration once before starting the server:
+
+```bash
+npm run install:ci
+npm run dev:setup
+npm run dev
+```
+
+The development server supplies local D1 and R2 bindings through
+Wrangler/Miniflare. Their state is stored in the ignored `.wrangler/`
+directory. Delete that directory to discard local data, then rerun
+`npm run dev:setup` before starting the server again.
+
 ## Sites Lifecycle
 
 The Sites lifecycle CLI runs the locked dependency install before returning this checkout. Edit the source under `app/`, then checkpoint when a coherent milestone is ready to inspect or share. The remote Sites builder runs `npm run build` against the pushed commit. Do not repeat install or build as a normal pre-checkpoint step.
