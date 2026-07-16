@@ -473,21 +473,29 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
     [snapshot.items, projectId, collectionId, type, taskStatus, dateFrom, dateTo],
   );
   const agendaEntries = useMemo(
-    () => sortAgendaEntries(entries, order),
-    [entries, order],
+    () => (mode === "agenda" ? sortAgendaEntries(entries, order) : entries),
+    [entries, mode, order],
   );
   const byDate = useMemo(() => {
+    if (mode === "agenda") {
+      return new Map<string, Array<WorkItemRecord & { date: string }>>();
+    }
     const result = new Map<string, Array<WorkItemRecord & { date: string }>>();
-    for (const entry of entries) result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
+    for (const entry of entries) {
+      result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
+    }
     return result;
-  }, [entries]);
+  }, [entries, mode]);
   const agendaByDate = useMemo(() => {
+    if (mode !== "agenda") {
+      return new Map<string, Array<WorkItemRecord & { date: string }>>();
+    }
     const result = new Map<string, Array<WorkItemRecord & { date: string }>>();
     for (const entry of agendaEntries) {
       result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
     }
     return result;
-  }, [agendaEntries]);
+  }, [agendaEntries, mode]);
   const days = mode === "month" ? monthGrid(anchor) : weekGrid(anchor);
 
   return (
