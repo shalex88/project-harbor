@@ -14,6 +14,8 @@ import {
   normalizeAgendaSortOrder,
   sortAgendaEntries,
 } from "./agenda-sort";
+import { isPastAgendaDate } from "./agenda-date-state";
+import { localDateIso } from "./current-date";
 import { EmptyState, MetricCard } from "./ui";
 import type { AppRoute } from "./app-shell";
 
@@ -28,6 +30,10 @@ const TIMELINE_MODES = [
   { id: "week", label: "Week" },
   { id: "agenda", label: "Agenda" },
 ] as const;
+
+const subscribeToCurrentDate = () => () => {};
+const getCurrentDateSnapshot = () => localDateIso(new Date());
+const getCurrentDateServerSnapshot = () => "";
 
 function useUrlFilter(
   parameter: string,
@@ -440,6 +446,11 @@ function shiftAnchor(anchor: string, mode: "month" | "week" | "agenda", amount: 
 }
 
 export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
+  const currentDate = useSyncExternalStore(
+    subscribeToCurrentDate,
+    getCurrentDateSnapshot,
+    getCurrentDateServerSnapshot,
+  );
   const [modeValue, setModeValue] = useUrlFilter("view", "agenda");
   const mode = TIMELINE_MODES.some((option) => option.id === modeValue)
     ? (modeValue as (typeof TIMELINE_MODES)[number]["id"])
@@ -563,7 +574,12 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
         >
           <div className="agenda-list">
             {[...agendaByDate.entries()].map(([date, items]) => (
-              <section className="agenda-day" key={date}>
+              <section
+                className={`agenda-day ${
+                  isPastAgendaDate(date, currentDate) ? "agenda-day-past" : ""
+                }`}
+                key={date}
+              >
                 <header><strong>{prettyDate(date)}</strong><span>{items.length} item{items.length === 1 ? "" : "s"}</span></header>
                 <div>
                   {items.map((item) => (

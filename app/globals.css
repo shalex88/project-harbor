@@ -926,6 +926,22 @@ a {
   border-bottom: 1px solid var(--border);
 }
 
+.agenda-day-past {
+  background: rgb(102 129 152 / 6%);
+}
+
+.agenda-day-past > header strong,
+.agenda-day-past .agenda-item > span,
+.agenda-day-past .agenda-item > strong,
+.agenda-day-past .agenda-item small {
+  color: var(--text-muted);
+}
+
+.agenda-day-past .agenda-item > strong,
+.agenda-day-past > header strong {
+  opacity: 0.78;
+}
+
 .agenda-day:last-child {
   border-bottom: 0;
 }

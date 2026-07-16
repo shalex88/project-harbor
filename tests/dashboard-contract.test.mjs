@@ -47,3 +47,9 @@ test("agenda exposes latest-first date sorting", () => {
   assert.match(source, /Sort agenda latest first/);
   assert.match(source, /agenda-sort-button/);
 });
+
+test("agenda marks only dates before the browser-local current date as past", () => {
+  assert.match(source, /isPastAgendaDate\(date, currentDate\)/);
+  assert.match(source, /agenda-day-past/);
+  assert.doesNotMatch(source, />Past</);
+});

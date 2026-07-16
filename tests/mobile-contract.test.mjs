@@ -39,3 +39,9 @@ test("reduced motion is respected", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test("past agenda groups use gray-only styling", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  assert.match(css, /\.agenda-day-past/);
+  assert.match(css, /\.agenda-day-past[\s\S]*color:\s*var\(--text-muted\)/);
+});
