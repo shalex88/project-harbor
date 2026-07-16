@@ -10,6 +10,10 @@ import {
   type WorkItemRecord,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import {
+  normalizeAgendaSortOrder,
+  sortAgendaEntries,
+} from "./agenda-sort";
 import { EmptyState, MetricCard } from "./ui";
 import type { AppRoute } from "./app-shell";
 
@@ -449,6 +453,8 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
   const [taskStatus, setTaskStatus] = useUrlFilter("status", "all");
   const [dateFrom, setDateFrom] = useUrlFilter("from", "");
   const [dateTo, setDateTo] = useUrlFilter("to", "");
+  const [orderValue, setOrderValue] = useUrlFilter("order", "desc");
+  const order = normalizeAgendaSortOrder(orderValue);
   const visibleCollections = snapshot.collections.filter(
     (collection) => projectId === "all" || collection.projectId === projectId,
   );
@@ -466,11 +472,30 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
       ),
     [snapshot.items, projectId, collectionId, type, taskStatus, dateFrom, dateTo],
   );
+  const agendaEntries = useMemo(
+    () => (mode === "agenda" ? sortAgendaEntries(entries, order) : entries),
+    [entries, mode, order],
+  );
   const byDate = useMemo(() => {
+    if (mode === "agenda") {
+      return new Map<string, Array<WorkItemRecord & { date: string }>>();
+    }
     const result = new Map<string, Array<WorkItemRecord & { date: string }>>();
-    for (const entry of entries) result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
+    for (const entry of entries) {
+      result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
+    }
     return result;
-  }, [entries]);
+  }, [entries, mode]);
+  const agendaByDate = useMemo(() => {
+    if (mode !== "agenda") {
+      return new Map<string, Array<WorkItemRecord & { date: string }>>();
+    }
+    const result = new Map<string, Array<WorkItemRecord & { date: string }>>();
+    for (const entry of agendaEntries) {
+      result.set(entry.date, [...(result.get(entry.date) ?? []), entry]);
+    }
+    return result;
+  }, [agendaEntries, mode]);
   const days = mode === "month" ? monthGrid(anchor) : weekGrid(anchor);
 
   return (
@@ -511,9 +536,33 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
         <FilterDate label="Timeline date to" value={dateTo} onChange={setDateTo} />
       </div>
       {mode === "agenda" ? (
-        <Panel title="Agenda" count={entries.length}>
+        <Panel
+          title="Agenda"
+          count={entries.length}
+          action={
+            <button
+              className="icon-button agenda-sort-button"
+              type="button"
+              aria-label={
+                order === "desc"
+                  ? "Sort agenda oldest first"
+                  : "Sort agenda latest first"
+              }
+              title={
+                order === "desc"
+                  ? "Sort agenda oldest first"
+                  : "Sort agenda latest first"
+              }
+              onClick={() =>
+                setOrderValue(order === "desc" ? "asc" : "desc")
+              }
+            >
+              <span aria-hidden="true">{order === "desc" ? "↓" : "↑"}</span>
+            </button>
+          }
+        >
           <div className="agenda-list">
-            {[...byDate.entries()].map(([date, items]) => (
+            {[...agendaByDate.entries()].map(([date, items]) => (
               <section className="agenda-day" key={date}>
                 <header><strong>{prettyDate(date)}</strong><span>{items.length} item{items.length === 1 ? "" : "s"}</span></header>
                 <div>

@@ -40,3 +40,10 @@ test("dashboards expose the approved detailed filters and breakdown", () => {
     assert.match(source, new RegExp(label));
   }
 });
+
+test("agenda exposes latest-first date sorting", () => {
+  assert.match(source, /useUrlFilter\(["']order["'], ["']desc["']\)/);
+  assert.match(source, /Sort agenda oldest first/);
+  assert.match(source, /Sort agenda latest first/);
+  assert.match(source, /agenda-sort-button/);
+});
