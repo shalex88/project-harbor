@@ -21,7 +21,7 @@ Past item buttons remain fully clickable and retain the same layout, focus behav
 
 ## Implementation Boundaries
 
-A small pure helper compares an Agenda ISO date with a supplied local-today ISO date. `TimelineDashboard` obtains the browser-local current date through the existing `todayIso()` boundary and applies `agenda-day-past` to an Agenda group when the helper returns true.
+A small pure helper compares an Agenda ISO date with a supplied local-today ISO date. `TimelineDashboard` obtains the browser-local current date through the shared current-date helper and applies `agenda-day-past` to an Agenda group when the helper returns true. A hydration-safe browser snapshot prevents the server timezone from deciding the viewer's past-date boundary.
 
 Focused CSS targets the past group header, item text, metadata, and type label. Existing base Agenda styles remain unchanged for today and future dates.
 
