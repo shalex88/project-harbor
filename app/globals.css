@@ -892,6 +892,11 @@ a {
   gap: 6px;
 }
 
+.agenda-sort-button {
+  color: var(--cyan);
+  font-size: 20px;
+}
+
 .timeline-toolbar .filter-control:first-of-type {
   margin-left: auto;
 }
