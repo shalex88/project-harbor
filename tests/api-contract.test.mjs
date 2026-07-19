@@ -70,6 +70,84 @@ test("events reject task workflow fields", () => {
   );
 });
 
+test("relationship mutations accept fixed types and canonicalize symmetric links", () => {
+  assert.deepEqual(
+    parseMutation({
+      action: "create_relation",
+      sourceItemId: "item-z",
+      targetItemId: "item-a",
+      relationType: "related_to",
+    }),
+    {
+      action: "create_relation",
+      sourceItemId: "item-a",
+      targetItemId: "item-z",
+      relationType: "related_to",
+    },
+  );
+  assert.deepEqual(
+    parseMutation({ action: "delete_relation", relationId: "relation-1" }),
+    { action: "delete_relation", relationId: "relation-1" },
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_relation",
+        sourceItemId: "item-1",
+        targetItemId: "item-2",
+        relationType: "duplicates",
+      }),
+    /invalid relationship type/i,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_relation",
+        sourceItemId: "item-1",
+        targetItemId: "item-1",
+        relationType: "related_to",
+      }),
+    /cannot relate an item to itself/i,
+  );
+});
+
+test("follow-up task mutations use ordinary task fields and a source event", () => {
+  assert.deepEqual(
+    parseMutation({
+      action: "create_follow_up_task",
+      sourceEventId: "event-1",
+      collectionId: "collection-1",
+      title: "Pay the Ministry of Housing voucher",
+      description: "",
+      status: "todo",
+      dueDate: null,
+      estimatedCostMinor: null,
+    }),
+    {
+      action: "create_follow_up_task",
+      sourceEventId: "event-1",
+      collectionId: "collection-1",
+      title: "Pay the Ministry of Housing voucher",
+      description: "",
+      status: "todo",
+      dueDate: null,
+      estimatedCostMinor: null,
+    },
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_follow_up_task",
+        sourceEventId: "event-1",
+        collectionId: "collection-1",
+        title: "Pay voucher",
+        status: "todo",
+        copiedEventDate: "2026-07-19",
+      }),
+    /unsupported field/i,
+  );
+});
+
 test("upload policy rejects executables and oversized item files", () => {
   assert.throws(
     () =>

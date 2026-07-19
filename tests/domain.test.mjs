@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   formatMoney,
   moneyInputValue,
+  normalizeRelationEndpoints,
   parseMoneyToMinor,
   projectTimeline,
   summarizeItemMoney,
@@ -13,6 +14,7 @@ import {
   validateIsoDate,
   validateWorkspaceRoute,
   validateTaskStatus,
+  validateRelationType,
 } from "../lib/domain.ts";
 
 test("task status accepts only todo, in_progress, and done", () => {
@@ -20,6 +22,31 @@ test("task status accepts only todo, in_progress, and done", () => {
   assert.equal(validateTaskStatus("in_progress"), "in_progress");
   assert.equal(validateTaskStatus("done"), "done");
   assert.throws(() => validateTaskStatus("review"), /invalid task status/);
+});
+
+test("relationship types accept only the supported fixed set", () => {
+  assert.equal(validateRelationType("follows_from"), "follows_from");
+  assert.equal(validateRelationType("blocks"), "blocks");
+  assert.equal(validateRelationType("related_to"), "related_to");
+  assert.throws(() => validateRelationType("duplicates"), /invalid relationship type/i);
+});
+
+test("symmetric relationships use canonical endpoint order", () => {
+  assert.deepEqual(
+    normalizeRelationEndpoints("related_to", "item-z", "item-a"),
+    { sourceItemId: "item-a", targetItemId: "item-z" },
+  );
+  assert.deepEqual(
+    normalizeRelationEndpoints("blocks", "item-z", "item-a"),
+    { sourceItemId: "item-z", targetItemId: "item-a" },
+  );
+});
+
+test("relationships reject self-links", () => {
+  assert.throws(
+    () => normalizeRelationEndpoints("follows_from", "item-a", "item-a"),
+    /cannot relate an item to itself/i,
+  );
 });
 
 test("money conversion uses integer minor units", () => {

@@ -1,6 +1,7 @@
 import { getRawD1 } from "@/db";
 import {
   DomainError,
+  normalizeRelationEndpoints,
   optionalText,
   requireText,
   summarizeItemMoney,
@@ -9,6 +10,7 @@ import {
   validateIsoDate,
   validateMinorAmount,
   validateOptionalIsoDate,
+  validateRelationType,
   validateTaskStatus,
   type AppUser,
   type CollectionRecord,
@@ -18,12 +20,20 @@ import {
   type PaymentRecord,
   type ProjectRecord,
   type ProjectRole,
+  type RelationType,
   type WorkItemRecord,
+  type WorkItemRelationRecord,
   type WorkspaceMutation,
+  type WorkspaceMutationResult,
   type WorkspaceSnapshot,
 } from "./domain";
 import { canManagePayment, normalizeEmail } from "./authorization";
 import type { IdentityUser } from "./auth";
+import {
+  DIRECTED_RELATION_INSERT_SQL,
+  directedRelationInsertParams,
+  isRelationUniqueConstraint,
+} from "./relation-persistence";
 
 type ProjectAccess = { projectId: string; userId: string; role: ProjectRole };
 
@@ -33,7 +43,9 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','member')), joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(project_id,user_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_invitations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, accepted_at TEXT, UNIQUE(project_id,email), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(invited_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'cyan', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
-  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','in_progress','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','in_progress','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))
+  `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
+  `CREATE TABLE IF NOT EXISTS work_item_relations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('follows_from','blocks','related_to')), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_item_id <> target_item_id), CHECK(type <> 'related_to' OR source_item_id < target_item_id), UNIQUE(project_id,type,source_item_id,target_item_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(source_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(target_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS item_files (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_object_id TEXT NOT NULL UNIQUE, pinned INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), paid_on TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
@@ -44,6 +56,8 @@ const PREVIEW_SCHEMA = [
   `CREATE INDEX IF NOT EXISTS work_items_collection_idx ON work_items(collection_id)`,
   `CREATE INDEX IF NOT EXISTS work_items_task_filter_idx ON work_items(project_id,type,status,due_date)`,
   `CREATE INDEX IF NOT EXISTS work_items_event_date_idx ON work_items(project_id,type,occurrence_date)`,
+  `CREATE INDEX IF NOT EXISTS work_item_relations_source_idx ON work_item_relations(project_id,source_item_id)`,
+  `CREATE INDEX IF NOT EXISTS work_item_relations_target_idx ON work_item_relations(project_id,target_item_id)`,
   `CREATE INDEX IF NOT EXISTS item_files_item_idx ON item_files(item_id,pinned,position)`,
   `CREATE INDEX IF NOT EXISTS payments_item_date_idx ON payments(item_id,paid_on)`,
 ];
@@ -346,6 +360,25 @@ async function projectForCollection(collectionId: string): Promise<string> {
   return row.project_id;
 }
 
+async function authorizedCollectionProject(
+  userId: string,
+  collectionId: string,
+): Promise<string> {
+  const projectId = await projectForCollection(collectionId);
+  try {
+    await requireProjectAccess(userId, projectId);
+  } catch (error) {
+    if (
+      error instanceof DomainError &&
+      (error.code === "not_found" || error.code === "forbidden")
+    ) {
+      throw new DomainError("Collection not found", "not_found");
+    }
+    throw error;
+  }
+  return projectId;
+}
+
 async function projectForItem(itemId: string): Promise<string> {
   const row = await first<{ project_id: string }>(
     "SELECT project_id FROM work_items WHERE id = ?",
@@ -353,6 +386,41 @@ async function projectForItem(itemId: string): Promise<string> {
   );
   if (!row) throw new DomainError("Item not found", "not_found");
   return row.project_id;
+}
+
+type ItemRelationContext = {
+  id: string;
+  projectId: string;
+  type: "task" | "event";
+};
+
+async function relationItem(itemId: string): Promise<ItemRelationContext> {
+  const row = await first<{
+    id: string;
+    project_id: string;
+    type: "task" | "event";
+  }>("SELECT id,project_id,type FROM work_items WHERE id = ?", itemId);
+  if (!row) throw new DomainError("Item not found", "not_found");
+  return { id: row.id, projectId: row.project_id, type: row.type };
+}
+
+async function authorizedRelationItem(
+  userId: string,
+  itemId: string,
+): Promise<ItemRelationContext> {
+  const item = await relationItem(itemId);
+  try {
+    await requireProjectAccess(userId, item.projectId);
+  } catch (error) {
+    if (
+      error instanceof DomainError &&
+      (error.code === "not_found" || error.code === "forbidden")
+    ) {
+      throw new DomainError("Item not found", "not_found");
+    }
+    throw error;
+  }
+  return item;
 }
 
 async function paymentContext(paymentId: string): Promise<{
@@ -587,6 +655,23 @@ export async function loadWorkspaceSnapshot(
     user.id,
   );
 
+  const relationRows = await all<{
+    id: string;
+    project_id: string;
+    source_item_id: string;
+    target_item_id: string;
+    type: RelationType;
+    created_by: string;
+    created_at: string;
+  }>(
+    `SELECT wir.id,wir.project_id,wir.source_item_id,wir.target_item_id,
+            wir.type,wir.created_by,wir.created_at
+     FROM work_item_relations wir
+     JOIN project_members current ON current.project_id = wir.project_id
+     WHERE current.user_id = ? ORDER BY wir.created_at,wir.id`,
+    user.id,
+  );
+
   const fileMap = new Map<string, ItemFileRecord[]>();
   for (const row of files) {
     const value: ItemFileRecord = {
@@ -696,6 +781,15 @@ export async function loadWorkspaceSnapshot(
       updatedAt: row.updated_at,
     })),
     items,
+    relations: relationRows.map<WorkItemRelationRecord>((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      sourceItemId: row.source_item_id,
+      targetItemId: row.target_item_id,
+      type: validateRelationType(row.type),
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    })),
     generatedAt: new Date().toISOString(),
   };
 }
@@ -703,9 +797,10 @@ export async function loadWorkspaceSnapshot(
 export async function applyWorkspaceMutation(
   identity: IdentityUser,
   mutation: WorkspaceMutation,
-): Promise<WorkspaceSnapshot> {
+): Promise<WorkspaceMutationResult> {
   await ensurePreviewSchema();
   const user = await syncUser(identity);
+  let createdItemId: string | null = null;
 
   switch (mutation.action) {
     case "create_project": {
@@ -970,6 +1065,144 @@ export async function applyWorkspaceMutation(
       ]);
       break;
     }
+    case "create_follow_up_task": {
+      const source = await authorizedRelationItem(
+        user.id,
+        mutation.sourceEventId,
+      );
+      if (source.type !== "event") {
+        throw new DomainError("Follow-up tasks require a source event");
+      }
+      const collectionProjectId = await authorizedCollectionProject(
+        user.id,
+        mutation.collectionId,
+      );
+      if (collectionProjectId !== source.projectId) {
+        throw new DomainError(
+          "Follow-up task collection must belong to the event project",
+        );
+      }
+      const taskId = crypto.randomUUID();
+      const estimate =
+        mutation.estimatedCostMinor === null ||
+        mutation.estimatedCostMinor === undefined
+          ? null
+          : validateMinorAmount(mutation.estimatedCostMinor);
+      const db = getRawD1();
+      await db.batch([
+        db
+          .prepare(
+            `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
+             VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
+          )
+          .bind(
+            taskId,
+            source.projectId,
+            mutation.collectionId,
+            requireText(mutation.title, "Task title", 160),
+            optionalText(mutation.description),
+            validateTaskStatus(mutation.status),
+            validateOptionalIsoDate(mutation.dueDate, "Due date"),
+            estimate,
+            user.id,
+          ),
+        db
+          .prepare(
+            `INSERT INTO work_item_relations (id,project_id,source_item_id,target_item_id,type,created_by)
+             VALUES (?,?,?,?, 'follows_from',?)`,
+          )
+          .bind(
+            crypto.randomUUID(),
+            source.projectId,
+            source.id,
+            taskId,
+            user.id,
+          ),
+      ]);
+      createdItemId = taskId;
+      break;
+    }
+    case "create_relation": {
+      const relationType = validateRelationType(mutation.relationType);
+      const endpoints = normalizeRelationEndpoints(
+        relationType,
+        mutation.sourceItemId,
+        mutation.targetItemId,
+      );
+      const [source, target] = await Promise.all([
+        authorizedRelationItem(user.id, endpoints.sourceItemId),
+        authorizedRelationItem(user.id, endpoints.targetItemId),
+      ]);
+      if (source.projectId !== target.projectId) {
+        throw new DomainError("Items must belong to the same project");
+      }
+      if (
+        relationType === "blocks" &&
+        (source.type !== "task" || target.type !== "task")
+      ) {
+        throw new DomainError("Blocking relationships require two tasks");
+      }
+      const relationId = crypto.randomUUID();
+      try {
+        if (relationType === "related_to") {
+          await run(
+            `INSERT INTO work_item_relations
+             (id,project_id,source_item_id,target_item_id,type,created_by)
+             VALUES (?,?,?,?,?,?)`,
+            relationId,
+            source.projectId,
+            source.id,
+            target.id,
+            relationType,
+            user.id,
+          );
+        } else {
+          const result = await getRawD1()
+            .prepare(DIRECTED_RELATION_INSERT_SQL)
+            .bind(
+              ...directedRelationInsertParams({
+                id: relationId,
+                projectId: source.projectId,
+                sourceItemId: source.id,
+                targetItemId: target.id,
+                type: relationType,
+                createdBy: user.id,
+              }),
+            )
+            .run();
+          if ((result.meta.changes ?? 0) === 0) {
+            throw new DomainError(
+              "Relationship would create a cycle",
+              "conflict",
+            );
+          }
+        }
+      } catch (error) {
+        if (isRelationUniqueConstraint(error)) {
+          throw new DomainError("Relationship already exists", "conflict");
+        }
+        throw error;
+      }
+      break;
+    }
+    case "delete_relation": {
+      const relation = await first<{ project_id: string }>(
+        `SELECT wir.project_id
+         FROM work_item_relations wir
+         JOIN project_members current ON current.project_id = wir.project_id
+         WHERE wir.id = ? AND current.user_id = ?`,
+        mutation.relationId,
+        user.id,
+      );
+      if (!relation) {
+        throw new DomainError("Relationship not found", "not_found");
+      }
+      await run(
+        "DELETE FROM work_item_relations WHERE id = ?",
+        mutation.relationId,
+      );
+      break;
+    }
     case "create_payment": {
       const projectId = await projectForItem(mutation.itemId);
       await requireProjectAccess(user.id, projectId);
@@ -1020,7 +1253,7 @@ export async function applyWorkspaceMutation(
     }
   }
 
-  return loadWorkspaceSnapshot(identity);
+  return { snapshot: await loadWorkspaceSnapshot(identity), createdItemId };
 }
 
 export async function getUserByIdentity(identity: IdentityUser): Promise<AppUser> {

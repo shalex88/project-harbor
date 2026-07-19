@@ -1,11 +1,13 @@
 import {
   DomainError,
+  normalizeRelationEndpoints,
   optionalText,
   requireText,
   validateCurrency,
   validateIsoDate,
   validateMinorAmount,
   validateOptionalIsoDate,
+  validateRelationType,
   validateTaskStatus,
   type WorkspaceMutation,
 } from "./domain.ts";
@@ -209,6 +211,43 @@ export function parseMutation(input: unknown): WorkspaceMutation {
     case "delete_item":
       rejectUnknown(value, ["itemId"]);
       return { action, itemId: id(value.itemId, "Item") };
+    case "create_follow_up_task":
+      rejectUnknown(value, [
+        "sourceEventId",
+        "collectionId",
+        "title",
+        "description",
+        "status",
+        "dueDate",
+        "estimatedCostMinor",
+      ]);
+      return {
+        action,
+        sourceEventId: id(value.sourceEventId, "Source event"),
+        collectionId: id(value.collectionId, "Collection"),
+        title: requireText(value.title, "Task title", 160),
+        description: optionalText(value.description),
+        status: validateTaskStatus(value.status),
+        dueDate: validateOptionalIsoDate(value.dueDate, "Due date"),
+        estimatedCostMinor: estimate(value.estimatedCostMinor),
+      };
+    case "create_relation": {
+      rejectUnknown(value, [
+        "sourceItemId",
+        "targetItemId",
+        "relationType",
+      ]);
+      const relationType = validateRelationType(value.relationType);
+      const endpoints = normalizeRelationEndpoints(
+        relationType,
+        id(value.sourceItemId, "Source item"),
+        id(value.targetItemId, "Target item"),
+      );
+      return { action, relationType, ...endpoints };
+    }
+    case "delete_relation":
+      rejectUnknown(value, ["relationId"]);
+      return { action, relationId: id(value.relationId, "Relationship") };
     case "create_payment":
       rejectUnknown(value, ["itemId", "amountMinor", "paidOn", "note"]);
       return {

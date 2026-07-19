@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { WorkspaceMutation, WorkspaceSnapshot } from "@/lib/domain";
+import type {
+  WorkspaceMutation,
+  WorkspaceMutationResult,
+  WorkspaceSnapshot,
+} from "@/lib/domain";
 import { AppShell, type AppRoute } from "./app-shell";
 import {
   EventsDashboard,
@@ -126,6 +130,22 @@ export function HarborApp({
     return data as WorkspaceSnapshot;
   };
 
+  const readMutationResponse = async (
+    response: Response,
+  ): Promise<WorkspaceMutationResult> => {
+    const data = (await response.json()) as
+      | WorkspaceMutationResult
+      | { error?: string };
+    if (!response.ok) {
+      throw new Error(
+        "error" in data && data.error
+          ? data.error
+          : "The request could not be completed",
+      );
+    }
+    return data as WorkspaceMutationResult;
+  };
+
   const acceptSnapshot = (next: WorkspaceSnapshot) => {
     setSnapshot(next);
     const nextProjectId = next.projects.some(
@@ -157,16 +177,22 @@ export function HarborApp({
   ): Promise<WorkspaceSnapshot> => {
     setPending(true);
     try {
-      const next = await readResponse(
+      const result = await readMutationResponse(
         await fetch("/api/workspace", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mutation),
         }),
       );
-      acceptSnapshot(next);
+      acceptSnapshot(result.snapshot);
+      if (
+        mutation.action === "create_follow_up_task" &&
+        result.createdItemId
+      ) {
+        setItemMode({ kind: "existing", itemId: result.createdItemId });
+      }
       pushToast(successMessage(mutation));
-      return next;
+      return result.snapshot;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to save changes";
@@ -450,9 +476,11 @@ export function HarborApp({
         pending={pending}
         uploadProgress={uploadProgress}
         onClose={() => setItemMode(null)}
-        onMutate={async (mutation) => {
-          await mutate(mutation);
-        }}
+        onMutate={mutate}
+        onOpenItem={(itemId) => setItemMode({ kind: "existing", itemId })}
+        onStartFollowUp={(sourceEventId, collectionId) =>
+          setItemMode({ kind: "follow-up", sourceEventId, collectionId })
+        }
         onUpload={upload}
         onTogglePin={togglePin}
         onDeleteFile={deleteFile}
@@ -645,6 +673,12 @@ function successMessage(mutation: WorkspaceMutation): string {
       return mutation.type === "task" ? "Task updated" : "Event updated";
     case "delete_item":
       return "Item deleted";
+    case "create_follow_up_task":
+      return "Follow-up task created";
+    case "create_relation":
+      return "Relationship added";
+    case "delete_relation":
+      return "Relationship removed";
     case "create_payment":
       return "Payment added";
     case "update_payment":

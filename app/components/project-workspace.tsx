@@ -9,6 +9,7 @@ import type {
   WorkspaceSnapshot,
 } from "@/lib/domain";
 import { formatMoney, summarizeSpending } from "@/lib/domain";
+import { workItemMetadata } from "@/lib/relation-metadata";
 import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from "./ui";
 
 type DialogState =
@@ -208,7 +209,20 @@ export function ProjectWorkspace({
               {tasks.map((task) => (
                 <button type="button" key={task.id} onClick={() => onOpenItem(task.id)}>
                   <span className={`task-check ${task.status === "done" ? "complete" : ""}`} aria-hidden="true">{task.status === "done" ? "✓" : ""}</span>
-                  <span className="row-title"><strong>{task.title}</strong><small>{task.dueDate ? `Due ${task.dueDate}` : "No due date"} · {task.status.replace("_", " ")}</small></span>
+                  <span className="row-title">
+                    <strong>{task.title}</strong>
+                    <small>
+                      {workItemMetadata(
+                        [
+                          task.dueDate ? `Due ${task.dueDate}` : "No due date",
+                          task.status.replace("_", " "),
+                        ],
+                        task.id,
+                        snapshot.relations,
+                        snapshot.items,
+                      )}
+                    </small>
+                  </span>
                   <span className="row-arrow" aria-hidden="true">›</span>
                 </button>
               ))}
@@ -224,7 +238,17 @@ export function ProjectWorkspace({
               {events.map((event) => (
                 <button type="button" key={event.id} onClick={() => onOpenItem(event.id)}>
                   <span className="event-mini-date" aria-hidden="true">{event.occurrenceDate.slice(5)}</span>
-                  <span className="row-title"><strong>{event.title}</strong><small>Occurs {event.occurrenceDate}</small></span>
+                  <span className="row-title">
+                    <strong>{event.title}</strong>
+                    <small>
+                      {workItemMetadata(
+                        [`Occurs ${event.occurrenceDate}`],
+                        event.id,
+                        snapshot.relations,
+                        snapshot.items,
+                      )}
+                    </small>
+                  </span>
                   <span className="row-arrow" aria-hidden="true">›</span>
                 </button>
               ))}

@@ -130,6 +130,7 @@ export const workItems = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("work_items_id_project_unique").on(table.id, table.projectId),
     index("work_items_project_idx").on(table.projectId),
     index("work_items_collection_idx").on(table.collectionId),
     index("work_items_task_filter_idx").on(
@@ -161,6 +162,61 @@ export const workItems = sqliteTable(
       foreignColumns: [collections.id, collections.projectId],
       name: "work_items_collection_project_fk",
     }).onDelete("cascade"),
+  ],
+);
+
+export const workItemRelations = sqliteTable(
+  "work_item_relations",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sourceItemId: text("source_item_id").notNull(),
+    targetItemId: text("target_item_id").notNull(),
+    type: text("type").notNull(),
+    createdBy: text("created_by")
+      .notNull()
+      .references(() => users.id),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("work_item_relations_unique").on(
+      table.projectId,
+      table.type,
+      table.sourceItemId,
+      table.targetItemId,
+    ),
+    index("work_item_relations_source_idx").on(
+      table.projectId,
+      table.sourceItemId,
+    ),
+    index("work_item_relations_target_idx").on(
+      table.projectId,
+      table.targetItemId,
+    ),
+    foreignKey({
+      columns: [table.sourceItemId, table.projectId],
+      foreignColumns: [workItems.id, workItems.projectId],
+      name: "work_item_relations_source_project_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.targetItemId, table.projectId],
+      foreignColumns: [workItems.id, workItems.projectId],
+      name: "work_item_relations_target_project_fk",
+    }).onDelete("cascade"),
+    check(
+      "work_item_relations_type_check",
+      sql`${table.type} IN ('follows_from', 'blocks', 'related_to')`,
+    ),
+    check(
+      "work_item_relations_distinct_items_check",
+      sql`${table.sourceItemId} <> ${table.targetItemId}`,
+    ),
+    check(
+      "work_item_relations_related_order_check",
+      sql`${table.type} <> 'related_to' OR ${table.sourceItemId} < ${table.targetItemId}`,
+    ),
   ],
 );
 
