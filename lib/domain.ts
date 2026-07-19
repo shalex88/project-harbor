@@ -14,6 +14,7 @@ export class DomainError extends Error {
 
 export type TaskStatus = "todo" | "in_progress" | "done";
 export type ItemType = "task" | "event";
+export type RelationType = "follows_from" | "blocks" | "related_to";
 export type ProjectRole = "owner" | "member";
 
 export type AppUser = {
@@ -118,6 +119,16 @@ export type EventRecord = WorkItemBase & {
 
 export type WorkItemRecord = TaskRecord | EventRecord;
 
+export type WorkItemRelationRecord = {
+  id: string;
+  projectId: string;
+  sourceItemId: string;
+  targetItemId: string;
+  type: RelationType;
+  createdBy: string;
+  createdAt: string;
+};
+
 export type WorkspaceSnapshot = {
   user: AppUser;
   projects: ProjectRecord[];
@@ -125,6 +136,7 @@ export type WorkspaceSnapshot = {
   invitations: InvitationRecord[];
   collections: CollectionRecord[];
   items: WorkItemRecord[];
+  relations: WorkItemRelationRecord[];
   generatedAt: string;
 };
 
@@ -202,6 +214,23 @@ export type WorkspaceMutation =
     }
   | { action: "delete_item"; itemId: string }
   | {
+      action: "create_follow_up_task";
+      sourceEventId: string;
+      collectionId: string;
+      title: string;
+      description?: string;
+      status: TaskStatus;
+      dueDate?: string | null;
+      estimatedCostMinor?: number | null;
+    }
+  | {
+      action: "create_relation";
+      sourceItemId: string;
+      targetItemId: string;
+      relationType: RelationType;
+    }
+  | { action: "delete_relation"; relationId: string }
+  | {
       action: "create_payment";
       itemId: string;
       amountMinor: number;
@@ -222,6 +251,31 @@ export function validateTaskStatus(value: unknown): TaskStatus {
     return value;
   }
   throw new DomainError("invalid task status");
+}
+
+export function validateRelationType(value: unknown): RelationType {
+  if (
+    value === "follows_from" ||
+    value === "blocks" ||
+    value === "related_to"
+  ) {
+    return value;
+  }
+  throw new DomainError("invalid relationship type");
+}
+
+export function normalizeRelationEndpoints(
+  type: RelationType,
+  sourceItemId: string,
+  targetItemId: string,
+): { sourceItemId: string; targetItemId: string } {
+  if (sourceItemId === targetItemId) {
+    throw new DomainError("Cannot relate an item to itself");
+  }
+  if (type === "related_to" && sourceItemId > targetItemId) {
+    return { sourceItemId: targetItemId, targetItemId: sourceItemId };
+  }
+  return { sourceItemId, targetItemId };
 }
 
 export function requireText(
