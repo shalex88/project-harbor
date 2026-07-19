@@ -19,6 +19,8 @@ export function relationMetadataPhrases(
   relations: WorkItemRelationRecord[],
   items: WorkItemRecord[],
 ): string[] {
+  const itemById = new Map(items.map((item) => [item.id, item] as const));
+
   return relations
     .filter(
       (relation) =>
@@ -30,9 +32,8 @@ export function relationMetadataPhrases(
       const linkedItemId = outgoing
         ? relation.targetItemId
         : relation.sourceItemId;
-      const linkedItem = items.find((item) => item.id === linkedItemId);
+      const linkedItem = itemById.get(linkedItemId);
       if (!linkedItem) return [];
-
       const prefix =
         relation.type === "follows_from"
           ? outgoing
