@@ -11,6 +11,7 @@ import type {
 import { formatMoney, summarizeSpending } from "@/lib/domain";
 import { workItemMetadata } from "@/lib/relation-metadata";
 import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from "./ui";
+import { WorkItemTitle } from "./work-item-title";
 
 type DialogState =
   | { kind: "project" }
@@ -210,7 +211,7 @@ export function ProjectWorkspace({
                 <button type="button" key={task.id} onClick={() => onOpenItem(task.id)}>
                   <span className={`task-check ${task.status === "done" ? "complete" : ""}`} aria-hidden="true">{task.status === "done" ? "✓" : ""}</span>
                   <span className="row-title">
-                    <strong>{task.title}</strong>
+                    <WorkItemTitle item={task} />
                     <small>
                       {workItemMetadata(
                         [
@@ -239,7 +240,7 @@ export function ProjectWorkspace({
                 <button type="button" key={event.id} onClick={() => onOpenItem(event.id)}>
                   <span className="event-mini-date" aria-hidden="true">{event.occurrenceDate.slice(5)}</span>
                   <span className="row-title">
-                    <strong>{event.title}</strong>
+                    <WorkItemTitle item={event} />
                     <small>
                       {workItemMetadata(
                         [`Occurs ${event.occurrenceDate}`],

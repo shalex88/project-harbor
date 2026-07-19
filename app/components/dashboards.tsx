@@ -21,6 +21,7 @@ import {
 import { isPastAgendaDate } from "./agenda-date-state";
 import { localDateIso } from "./current-date";
 import { EmptyState, MetricCard } from "./ui";
+import { WorkItemTitle } from "./work-item-title";
 import type { AppRoute } from "./app-shell";
 
 type DashboardProps = {
@@ -202,7 +203,7 @@ function TaskRow({
         {item.status === "done" ? "✓" : ""}
       </span>
       <span className="row-title">
-        <strong>{item.title}</strong>
+        <WorkItemTitle item={item} />
         <small>
           {workItemMetadata(
             [
@@ -238,7 +239,7 @@ function EventRow({
         <small>{new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(new Date(`${item.occurrenceDate}T00:00:00Z`))}</small>
       </span>
       <span className="row-title">
-        <strong>{item.title}</strong>
+        <WorkItemTitle item={item} />
         <small>
           {workItemMetadata(
             [
@@ -617,7 +618,7 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                   {items.map((item) => (
                     <button className={`agenda-item agenda-${item.type}`} type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
                       <span>{item.type === "task" ? "Task" : "Event"}</span>
-                      <strong>{item.title}</strong>
+                      <WorkItemTitle item={item} />
                       <small>
                         {workItemMetadata(
                           [
@@ -659,7 +660,7 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                       <span aria-hidden="true">
                         {item.type === "task" ? "✓" : "◷"}
                       </span>
-                      <strong>{item.title}</strong>
+                      <WorkItemTitle item={item} />
                       {relationPhrases.length ? (
                         <small>{relationPhrases.join(" · ")}</small>
                       ) : null}
@@ -808,7 +809,7 @@ export function SpendingDashboard({ snapshot, onOpenItem }: DashboardProps) {
             {overEstimate.map((item) => (
               <button className="money-row" type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
                 <span className="row-title">
-                  <strong>{item.title}</strong>
+                  <WorkItemTitle item={item} />
                   <small>
                     {workItemMetadata(
                       [projectName(snapshot, item.projectId)],
