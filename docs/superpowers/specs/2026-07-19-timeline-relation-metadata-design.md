@@ -1,27 +1,34 @@
-# Timeline Relation Metadata Design
+# Dashboard Work Item Relation Metadata Design
 
 Date: 2026-07-19
 
 ## Summary
 
-Agenda rows in the Timeline will append human-readable relationship context to
-the existing project and collection metadata. A linked task will read, for
-example:
+Every task and event shown on a dashboard or inside a project's collection view
+will include human-readable relationship context alongside its existing
+supporting metadata. A linked task will read, for example:
 
 `Q3 Planning · Operating plan · Follow-up for Q3 kickoff`
 
-This change makes causality and dependencies visible while scanning the Agenda
-without requiring the user to open each item's Relations tab.
+This change makes causality and dependencies visible while scanning any
+work-item list without requiring the user to open each item's Relations tab.
 
 ## Scope
 
-- Add relation metadata to the Timeline's Agenda view.
-- Keep the existing project and collection metadata first.
+- Add relation metadata to every visible task or event in Overview, Tasks,
+  Events, Timeline, and Spending.
+- Add the same metadata to task and event rows inside project collection views.
+- Keep each surface's existing metadata first, such as project and collection,
+  due date and status, or occurrence date.
 - Show every relationship attached to the item, separated with ` · `.
-- Leave Month and Week calendar cells unchanged so their compact layout remains
-  readable.
-- Do not add relation creation or removal controls to the Timeline. Selecting an
-  Agenda row continues to open the item sheet, where relationships are managed.
+- Include relation text in the compact Month and Week Timeline cells as a
+  secondary line and allow the cell to grow when several relationships exist.
+- Include relationship metadata on Spending rows that directly represent a
+  task or event. Leave payment-history rows unchanged because those rows
+  represent payments rather than work items.
+- Do not add relation creation or removal controls to dashboards. Selecting a
+  work-item row continues to open the item sheet, where relationships are
+  managed.
 
 ## Relationship Labels
 
@@ -41,18 +48,25 @@ metadata.
 ## Components and Data Flow
 
 A small pure helper accepts the current item ID, the workspace's relationship
-records, and its work items. It returns the ordered display phrases. The Agenda
-row joins the project name, collection name, and returned phrases with ` · `.
+records, and its work items. It returns the ordered display phrases. A reusable
+metadata helper appends those phrases to a surface's existing metadata parts
+and joins them with ` · `.
 
-The Timeline already receives the complete workspace snapshot, so the feature
-requires no schema, migration, repository, or API changes.
+The shared task and event rows used by Overview, Tasks, and Events consume this
+helper directly. Timeline Agenda rows, Timeline Month and Week cells, Spending
+work-item rows, and project collection task/event rows use the same helper so
+labels and ordering cannot drift between views.
+
+All affected views already receive the complete workspace snapshot, so the
+feature requires no schema, migration, repository, or API changes.
 
 ## Layout and Accessibility
 
-The metadata remains inside the Agenda row's existing `<small>` element, so its
-visual hierarchy and row click target stay unchanged. Metadata may wrap when
-needed instead of truncating relationships. Existing past-item muted styling
-continues to apply to the whole metadata line.
+Relation phrases remain inside each row or card's existing supporting-text
+region, so visual hierarchy and click targets stay unchanged. Metadata may wrap
+when needed instead of truncating relationships. Timeline Month and Week cells
+gain a smaller secondary text line inside the existing item button. Existing
+past-item muted styling continues to apply to the whole metadata line.
 
 ## Testing
 
@@ -60,8 +74,11 @@ Tests will cover:
 
 - each relationship type and both directed perspectives;
 - multiple relationships rendered in deterministic order;
-- project and collection metadata preceding relation phrases;
+- each surface's existing metadata preceding relation phrases;
 - items without relationships retaining their current metadata;
 - missing linked records being ignored;
-- Month and Week calendar rendering remaining unchanged;
+- Overview, Tasks, Events, Timeline Agenda, Timeline Month/Week, Spending, and
+  project collection rows all using the shared relation metadata;
+- payment-history rows remaining unchanged;
+- responsive wrapping and past-item styling remaining intact;
 - the full production build, automated test suite, and lint checks.
