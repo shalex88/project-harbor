@@ -24,8 +24,16 @@ const MOBILE_ITEMS: Array<{ route: AppRoute | "more"; label: string; mark: strin
   { route: "more", label: "More", mark: "•••" },
 ];
 
-const subscribeToCurrentDate = () => () => {};
-const getCurrentDateSnapshot = () => formatCurrentDate(new Date());
+let cachedCurrentDate = "";
+
+const subscribeToCurrentDate = (onStoreChange: () => void) => {
+  if (cachedCurrentDate === "") {
+    cachedCurrentDate = formatCurrentDate(new Date());
+    queueMicrotask(onStoreChange);
+  }
+  return () => {};
+};
+const getCurrentDateSnapshot = () => cachedCurrentDate;
 const getCurrentDateServerSnapshot = () => "";
 
 export function AppShell({
