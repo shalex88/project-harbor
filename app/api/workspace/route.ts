@@ -33,10 +33,10 @@ export async function POST(request: Request) {
     }
     const mutation = parseMutation(body);
     const deletedObjectKeys = await listMutationFileKeys(identity, mutation);
-    const snapshot = await applyWorkspaceMutation(identity, mutation);
+    const result = await applyWorkspaceMutation(identity, mutation);
     await deleteObjectsBestEffort(deletedObjectKeys);
     const created = mutation.action.startsWith("create_");
-    return Response.json(snapshot, {
+    return Response.json(result, {
       status: created ? 201 : 200,
       headers: { "Cache-Control": "private, no-store" },
     });

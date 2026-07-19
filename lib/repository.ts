@@ -24,10 +24,16 @@ import {
   type WorkItemRecord,
   type WorkItemRelationRecord,
   type WorkspaceMutation,
+  type WorkspaceMutationResult,
   type WorkspaceSnapshot,
 } from "./domain";
 import { canManagePayment, normalizeEmail } from "./authorization";
 import type { IdentityUser } from "./auth";
+import {
+  DIRECTED_RELATION_INSERT_SQL,
+  directedRelationInsertParams,
+  isRelationUniqueConstraint,
+} from "./relation-persistence";
 
 type ProjectAccess = { projectId: string; userId: string; role: ProjectRole };
 
@@ -354,6 +360,25 @@ async function projectForCollection(collectionId: string): Promise<string> {
   return row.project_id;
 }
 
+async function authorizedCollectionProject(
+  userId: string,
+  collectionId: string,
+): Promise<string> {
+  const projectId = await projectForCollection(collectionId);
+  try {
+    await requireProjectAccess(userId, projectId);
+  } catch (error) {
+    if (
+      error instanceof DomainError &&
+      (error.code === "not_found" || error.code === "forbidden")
+    ) {
+      throw new DomainError("Collection not found", "not_found");
+    }
+    throw error;
+  }
+  return projectId;
+}
+
 async function projectForItem(itemId: string): Promise<string> {
   const row = await first<{ project_id: string }>(
     "SELECT project_id FROM work_items WHERE id = ?",
@@ -379,32 +404,23 @@ async function relationItem(itemId: string): Promise<ItemRelationContext> {
   return { id: row.id, projectId: row.project_id, type: row.type };
 }
 
-async function assertNoRelationCycle(
-  projectId: string,
-  type: Exclude<RelationType, "related_to">,
-  sourceItemId: string,
-  targetItemId: string,
-): Promise<void> {
-  const cycle = await first<{ item_id: string }>(
-    `WITH RECURSIVE reachable(item_id) AS (
-       SELECT target_item_id FROM work_item_relations
-       WHERE project_id = ? AND type = ? AND source_item_id = ?
-       UNION
-       SELECT wir.target_item_id FROM work_item_relations wir
-       JOIN reachable ON reachable.item_id = wir.source_item_id
-       WHERE wir.project_id = ? AND wir.type = ?
-     )
-     SELECT item_id FROM reachable WHERE item_id = ? LIMIT 1`,
-    projectId,
-    type,
-    targetItemId,
-    projectId,
-    type,
-    sourceItemId,
-  );
-  if (cycle) {
-    throw new DomainError("Relationship would create a cycle", "conflict");
+async function authorizedRelationItem(
+  userId: string,
+  itemId: string,
+): Promise<ItemRelationContext> {
+  const item = await relationItem(itemId);
+  try {
+    await requireProjectAccess(userId, item.projectId);
+  } catch (error) {
+    if (
+      error instanceof DomainError &&
+      (error.code === "not_found" || error.code === "forbidden")
+    ) {
+      throw new DomainError("Item not found", "not_found");
+    }
+    throw error;
   }
+  return item;
 }
 
 async function paymentContext(paymentId: string): Promise<{
@@ -781,9 +797,10 @@ export async function loadWorkspaceSnapshot(
 export async function applyWorkspaceMutation(
   identity: IdentityUser,
   mutation: WorkspaceMutation,
-): Promise<WorkspaceSnapshot> {
+): Promise<WorkspaceMutationResult> {
   await ensurePreviewSchema();
   const user = await syncUser(identity);
+  let createdItemId: string | null = null;
 
   switch (mutation.action) {
     case "create_project": {
@@ -1049,12 +1066,15 @@ export async function applyWorkspaceMutation(
       break;
     }
     case "create_follow_up_task": {
-      const source = await relationItem(mutation.sourceEventId);
+      const source = await authorizedRelationItem(
+        user.id,
+        mutation.sourceEventId,
+      );
       if (source.type !== "event") {
         throw new DomainError("Follow-up tasks require a source event");
       }
-      await requireProjectAccess(user.id, source.projectId);
-      const collectionProjectId = await projectForCollection(
+      const collectionProjectId = await authorizedCollectionProject(
+        user.id,
         mutation.collectionId,
       );
       if (collectionProjectId !== source.projectId) {
@@ -1099,6 +1119,7 @@ export async function applyWorkspaceMutation(
             user.id,
           ),
       ]);
+      createdItemId = taskId;
       break;
     }
     case "create_relation": {
@@ -1109,49 +1130,59 @@ export async function applyWorkspaceMutation(
         mutation.targetItemId,
       );
       const [source, target] = await Promise.all([
-        relationItem(endpoints.sourceItemId),
-        relationItem(endpoints.targetItemId),
+        authorizedRelationItem(user.id, endpoints.sourceItemId),
+        authorizedRelationItem(user.id, endpoints.targetItemId),
       ]);
       if (source.projectId !== target.projectId) {
         throw new DomainError("Items must belong to the same project");
       }
-      await requireProjectAccess(user.id, source.projectId);
       if (
         relationType === "blocks" &&
         (source.type !== "task" || target.type !== "task")
       ) {
         throw new DomainError("Blocking relationships require two tasks");
       }
-      if (relationType !== "related_to") {
-        await assertNoRelationCycle(
-          source.projectId,
-          relationType,
-          source.id,
-          target.id,
-        );
+      const relationId = crypto.randomUUID();
+      try {
+        if (relationType === "related_to") {
+          await run(
+            `INSERT INTO work_item_relations
+             (id,project_id,source_item_id,target_item_id,type,created_by)
+             VALUES (?,?,?,?,?,?)`,
+            relationId,
+            source.projectId,
+            source.id,
+            target.id,
+            relationType,
+            user.id,
+          );
+        } else {
+          const result = await getRawD1()
+            .prepare(DIRECTED_RELATION_INSERT_SQL)
+            .bind(
+              ...directedRelationInsertParams({
+                id: relationId,
+                projectId: source.projectId,
+                sourceItemId: source.id,
+                targetItemId: target.id,
+                type: relationType,
+                createdBy: user.id,
+              }),
+            )
+            .run();
+          if ((result.meta.changes ?? 0) === 0) {
+            throw new DomainError(
+              "Relationship would create a cycle",
+              "conflict",
+            );
+          }
+        }
+      } catch (error) {
+        if (isRelationUniqueConstraint(error)) {
+          throw new DomainError("Relationship already exists", "conflict");
+        }
+        throw error;
       }
-      const duplicate = await first<{ id: string }>(
-        `SELECT id FROM work_item_relations
-         WHERE project_id=? AND type=? AND source_item_id=? AND target_item_id=?`,
-        source.projectId,
-        relationType,
-        source.id,
-        target.id,
-      );
-      if (duplicate) {
-        throw new DomainError("Relationship already exists", "conflict");
-      }
-      await run(
-        `INSERT INTO work_item_relations
-         (id,project_id,source_item_id,target_item_id,type,created_by)
-         VALUES (?,?,?,?,?,?)`,
-        crypto.randomUUID(),
-        source.projectId,
-        source.id,
-        target.id,
-        relationType,
-        user.id,
-      );
       break;
     }
     case "delete_relation": {
@@ -1219,7 +1250,7 @@ export async function applyWorkspaceMutation(
     }
   }
 
-  return loadWorkspaceSnapshot(identity);
+  return { snapshot: await loadWorkspaceSnapshot(identity), createdItemId };
 }
 
 export async function getUserByIdentity(identity: IdentityUser): Promise<AppUser> {

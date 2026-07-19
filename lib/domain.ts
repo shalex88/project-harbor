@@ -140,6 +140,11 @@ export type WorkspaceSnapshot = {
   generatedAt: string;
 };
 
+export type WorkspaceMutationResult = {
+  snapshot: WorkspaceSnapshot;
+  createdItemId: string | null;
+};
+
 export type WorkspaceMutation =
   | {
       action: "create_project";

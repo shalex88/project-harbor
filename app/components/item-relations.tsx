@@ -2,20 +2,17 @@
 
 import { useState, type FormEvent } from "react";
 import {
-  type RelationType,
   type WorkItemRecord,
   type WorkItemRelationRecord,
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import {
+  isRelationCandidateAvailable,
+  relationMutation,
+  type RelationMeaning,
+} from "@/lib/relation-ui";
 import { Field, SubmitForm } from "./ui";
-
-type RelationMeaning =
-  | "follow_up"
-  | "follows_from"
-  | "blocks"
-  | "blocked_by"
-  | "related_to";
 
 const relationMeaningLabels: Record<RelationMeaning, string> = {
   follow_up: "Follow-up item",
@@ -24,41 +21,6 @@ const relationMeaningLabels: Record<RelationMeaning, string> = {
   blocked_by: "Blocked by",
   related_to: "Related item",
 };
-
-function relationMutation(
-  itemId: string,
-  selectedItemId: string,
-  meaning: RelationMeaning,
-): {
-  sourceItemId: string;
-  targetItemId: string;
-  relationType: RelationType;
-} {
-  if (meaning === "follows_from") {
-    return {
-      sourceItemId: selectedItemId,
-      targetItemId: itemId,
-      relationType: "follows_from",
-    };
-  }
-  if (meaning === "blocked_by") {
-    return {
-      sourceItemId: selectedItemId,
-      targetItemId: itemId,
-      relationType: "blocks",
-    };
-  }
-  return {
-    sourceItemId: itemId,
-    targetItemId: selectedItemId,
-    relationType:
-      meaning === "follow_up"
-        ? "follows_from"
-        : meaning === "blocks"
-          ? "blocks"
-          : "related_to",
-  };
-}
 
 function relationGroupLabel(
   relation: WorkItemRelationRecord,
@@ -97,22 +59,17 @@ export function ItemRelationsPanel({
     (relation) =>
       relation.sourceItemId === item.id || relation.targetItemId === item.id,
   );
-  const relatedItemIds = new Set(
-    itemRelations.flatMap((relation) => [
-      relation.sourceItemId,
-      relation.targetItemId,
-    ]),
-  );
   const relationCandidates = snapshot.items.filter(
     (candidate) =>
-      candidate.projectId === item.projectId &&
-      candidate.id !== item.id &&
-      !relatedItemIds.has(candidate.id) &&
+      isRelationCandidateAvailable(
+        item,
+        candidate,
+        relationMeaning,
+        snapshot.relations,
+      ) &&
       candidate.title
         .toLocaleLowerCase()
-        .includes(relationSearch.trim().toLocaleLowerCase()) &&
-      ((relationMeaning !== "blocks" && relationMeaning !== "blocked_by") ||
-        candidate.type === "task"),
+        .includes(relationSearch.trim().toLocaleLowerCase()),
   );
   const relationGroups = [
     "Follows from",

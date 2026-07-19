@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import type { WorkspaceMutation, WorkspaceSnapshot } from "@/lib/domain";
+import type {
+  WorkspaceMutation,
+  WorkspaceMutationResult,
+  WorkspaceSnapshot,
+} from "@/lib/domain";
 import { AppShell, type AppRoute } from "./app-shell";
 import {
   EventsDashboard,
@@ -126,6 +130,22 @@ export function HarborApp({
     return data as WorkspaceSnapshot;
   };
 
+  const readMutationResponse = async (
+    response: Response,
+  ): Promise<WorkspaceMutationResult> => {
+    const data = (await response.json()) as
+      | WorkspaceMutationResult
+      | { error?: string };
+    if (!response.ok) {
+      throw new Error(
+        "error" in data && data.error
+          ? data.error
+          : "The request could not be completed",
+      );
+    }
+    return data as WorkspaceMutationResult;
+  };
+
   const acceptSnapshot = (next: WorkspaceSnapshot) => {
     setSnapshot(next);
     const nextProjectId = next.projects.some(
@@ -157,16 +177,22 @@ export function HarborApp({
   ): Promise<WorkspaceSnapshot> => {
     setPending(true);
     try {
-      const next = await readResponse(
+      const result = await readMutationResponse(
         await fetch("/api/workspace", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(mutation),
         }),
       );
-      acceptSnapshot(next);
+      acceptSnapshot(result.snapshot);
+      if (
+        mutation.action === "create_follow_up_task" &&
+        result.createdItemId
+      ) {
+        setItemMode({ kind: "existing", itemId: result.createdItemId });
+      }
       pushToast(successMessage(mutation));
-      return next;
+      return result.snapshot;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to save changes";
@@ -450,19 +476,7 @@ export function HarborApp({
         pending={pending}
         uploadProgress={uploadProgress}
         onClose={() => setItemMode(null)}
-        onMutate={async (mutation) => {
-          const previousItemIds = new Set(snapshot.items.map((item) => item.id));
-          const next = await mutate(mutation);
-          if (mutation.action === "create_follow_up_task") {
-            const createdTask = next.items.find(
-              (item) => item.type === "task" && !previousItemIds.has(item.id),
-            );
-            if (createdTask) {
-              setItemMode({ kind: "existing", itemId: createdTask.id });
-            }
-          }
-          return next;
-        }}
+        onMutate={mutate}
         onOpenItem={(itemId) => setItemMode({ kind: "existing", itemId })}
         onStartFollowUp={(sourceEventId, collectionId) =>
           setItemMode({ kind: "follow-up", sourceEventId, collectionId })

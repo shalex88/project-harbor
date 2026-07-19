@@ -60,6 +60,6 @@ test("events create linked follow-up tasks without changing item type", () => {
   assert.match(itemSource, /action: "create_follow_up_task"/);
   assert.match(itemSource, /Follows from/);
   assert.match(itemSource, /kind: "follow-up"/);
-  assert.match(harborSource, /createdTask/);
+  assert.match(harborSource, /result\.createdItemId/);
   assert.doesNotMatch(itemSource, /convert/i);
 });

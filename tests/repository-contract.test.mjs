@@ -6,6 +6,10 @@ const repository = await readFile(
   new URL("../lib/repository.ts", import.meta.url),
   "utf8",
 );
+const relationPersistence = await readFile(
+  new URL("../lib/relation-persistence.ts", import.meta.url),
+  "utf8",
+);
 
 test("duplicate pending invitations produce a conflict", () => {
   assert.match(
@@ -20,13 +24,48 @@ test("repository enforces relationship graph and project invariants", () => {
     'case "create_relation"',
     'case "delete_relation"',
     'case "create_follow_up_task"',
-    "WITH RECURSIVE reachable",
     "Relationship would create a cycle",
     "Blocking relationships require two tasks",
     "Items must belong to the same project",
   ]) {
     assert.match(repository, new RegExp(sourceMarker));
   }
+  assert.match(relationPersistence, /WITH RECURSIVE/);
+  assert.match(relationPersistence, /reachable\(item_id\)/);
+});
+
+test("relation endpoints are authorized before project details are compared", () => {
+  const relationCase = repository.slice(
+    repository.indexOf('case "create_relation"'),
+    repository.indexOf('case "delete_relation"'),
+  );
+  assert.match(relationCase, /authorizedRelationItem\(user\.id/);
+  assert.ok(
+    relationCase.indexOf("authorizedRelationItem") <
+      relationCase.indexOf("Items must belong to the same project"),
+  );
+});
+
+test("follow-up responses identify the task created by the mutation", () => {
+  assert.match(repository, /createdItemId = taskId/);
+  assert.match(repository, /return \{ snapshot: await loadWorkspaceSnapshot\(identity\), createdItemId \}/);
+});
+
+test("follow-up collections are authorized before project comparison", () => {
+  const followUpCase = repository.slice(
+    repository.indexOf('case "create_follow_up_task"'),
+    repository.indexOf('case "create_relation"'),
+  );
+  assert.match(
+    followUpCase,
+    /authorizedCollectionProject\(\s*user\.id,\s*mutation\.collectionId/,
+  );
+  assert.ok(
+    followUpCase.indexOf("authorizedCollectionProject") <
+      followUpCase.indexOf(
+        "Follow-up task collection must belong to the event project",
+      ),
+  );
 });
 
 test("follow-up creation batches the task and follows-from relation", () => {
