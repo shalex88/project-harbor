@@ -126,4 +126,3 @@ Tests will cover:
   the event follow-up action;
 - unchanged task/event type invariants and existing dashboard behavior;
 - full automated test, lint, and production-build verification.
-
