@@ -1443,7 +1443,7 @@ a {
 
 .item-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -1509,6 +1509,121 @@ a {
   justify-content: space-between;
   border-top: 1px solid var(--border);
   padding-top: 18px;
+}
+
+.follow-up-source {
+  display: grid;
+  gap: 3px;
+  border: 1px solid rgba(94, 234, 212, 0.38);
+  border-left: 3px solid var(--seafoam);
+  border-radius: 8px;
+  background: rgba(94, 234, 212, 0.06);
+  padding: 11px 13px;
+}
+
+.follow-up-source span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.follow-up-source strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.item-secondary-actions {
+  flex-wrap: wrap;
+}
+
+.relations-panel,
+.relation-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.relation-group,
+.relation-add-form {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(7, 17, 31, 0.28);
+}
+
+.relation-group > header,
+.relation-add-form > header {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+}
+
+.relation-group h3,
+.relation-add-form h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.relation-group > header span,
+.relation-add-form > header span,
+.relation-empty {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.relation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+}
+
+.relation-row:last-child {
+  border-bottom: 0;
+}
+
+.relation-open {
+  display: grid;
+  min-width: 0;
+  min-height: 44px;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.relation-actions .button {
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 10px;
+}
+
+.relation-empty {
+  margin: 0;
+  padding: 14px;
+}
+
+.relation-add-form {
+  display: grid;
+  gap: 14px;
+  padding: 0 14px 14px;
+}
+
+.relation-add-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .drop-zone {
@@ -2193,6 +2308,27 @@ a {
   .item-form-actions > div {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .item-tabs {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .item-tabs button:nth-child(2) {
+    border-right: 0;
+  }
+
+  .item-tabs button:nth-child(-n + 2) {
+    border-bottom: 1px solid var(--border);
+  }
+
+  .relation-row,
+  .relation-add-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .relation-actions .button {
+    width: 100%;
   }
 
   .file-list article {

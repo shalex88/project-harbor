@@ -976,6 +976,10 @@
         "work_item_relations_distinct_items_check": {
           "name": "work_item_relations_distinct_items_check",
           "value": "\"work_item_relations\".\"source_item_id\" <> \"work_item_relations\".\"target_item_id\""
+        },
+        "work_item_relations_related_order_check": {
+          "name": "work_item_relations_related_order_check",
+          "value": "\"work_item_relations\".\"type\" <> 'related_to' OR \"work_item_relations\".\"source_item_id\" < \"work_item_relations\".\"target_item_id\""
         }
       }
     },

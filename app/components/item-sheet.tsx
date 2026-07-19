@@ -10,9 +10,11 @@ import {
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
+import { ItemRelationsPanel } from "./item-relations";
 
 export type ItemSheetMode =
   | { kind: "new"; type: "task" | "event"; collectionId: string }
+  | { kind: "follow-up"; sourceEventId: string; collectionId: string }
   | { kind: "existing"; itemId: string }
   | null;
 
@@ -25,6 +27,8 @@ export function ItemSheet({
   uploadProgress,
   onClose,
   onMutate,
+  onOpenItem,
+  onStartFollowUp,
   onUpload,
   onTogglePin,
   onDeleteFile,
@@ -34,14 +38,31 @@ export function ItemSheet({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<void>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onOpenItem: (itemId: string) => void;
+  onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
   onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
-  const key = mode?.kind === "existing" ? mode.itemId : mode ? `new-${mode.type}-${mode.collectionId}` : "closed";
+  const key =
+    mode?.kind === "existing"
+      ? mode.itemId
+      : mode?.kind === "follow-up"
+        ? `follow-up-${mode.sourceEventId}-${mode.collectionId}`
+        : mode
+          ? `new-${mode.type}-${mode.collectionId}`
+          : "closed";
+  const title =
+    mode?.kind === "existing"
+      ? "Item details"
+      : mode?.kind === "follow-up"
+        ? "New follow-up task"
+        : mode?.type === "event"
+          ? "New event"
+          : "New task";
   return (
-    <Sheet open={Boolean(mode)} title={mode?.kind === "existing" ? "Item details" : mode?.type === "event" ? "New event" : "New task"} onClose={onClose}>
+    <Sheet open={Boolean(mode)} title={title} onClose={onClose}>
       {mode ? (
         <ItemSheetContent
           key={key}
@@ -51,6 +72,8 @@ export function ItemSheet({
           uploadProgress={uploadProgress}
           onClose={onClose}
           onMutate={onMutate}
+          onOpenItem={onOpenItem}
+          onStartFollowUp={onStartFollowUp}
           onUpload={onUpload}
           onTogglePin={onTogglePin}
           onDeleteFile={onDeleteFile}
@@ -67,6 +90,8 @@ function ItemSheetContent({
   uploadProgress,
   onClose,
   onMutate,
+  onOpenItem,
+  onStartFollowUp,
   onUpload,
   onTogglePin,
   onDeleteFile,
@@ -76,17 +101,26 @@ function ItemSheetContent({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<void>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onOpenItem: (itemId: string) => void;
+  onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
   onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const item = mode.kind === "existing" ? snapshot.items.find((candidate) => candidate.id === mode.itemId) ?? null : null;
+  const sourceEvent =
+    mode.kind === "follow-up"
+      ? snapshot.items.find(
+          (candidate) =>
+            candidate.id === mode.sourceEventId && candidate.type === "event",
+        ) ?? null
+      : null;
   const type = item?.type ?? (mode.kind === "new" ? mode.type : "task");
-  const collectionId = item?.collectionId ?? (mode.kind === "new" ? mode.collectionId : "");
+  const collectionId = item?.collectionId ?? (mode.kind === "new" || mode.kind === "follow-up" ? mode.collectionId : "");
   const collection = snapshot.collections.find((candidate) => candidate.id === collectionId);
-  const project = snapshot.projects.find((candidate) => candidate.id === (item?.projectId ?? collection?.projectId));
-  const [tab, setTab] = useState<"details" | "files" | "payments">("details");
+  const project = snapshot.projects.find((candidate) => candidate.id === (item?.projectId ?? sourceEvent?.projectId ?? collection?.projectId));
+  const [tab, setTab] = useState<"details" | "files" | "payments" | "relations">("details");
   const [localError, setLocalError] = useState("");
   const [dragActive, setDragActive] = useState(false);
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
@@ -100,6 +134,9 @@ function ItemSheetContent({
 
   if (mode.kind === "existing" && !item) {
     return <EmptyState title="Item unavailable" description="It may have been removed or moved while this panel was open." />;
+  }
+  if (mode.kind === "follow-up" && !sourceEvent) {
+    return <EmptyState title="Source event unavailable" description="It may have been removed while this panel was open." />;
   }
 
   const handleItemSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -120,11 +157,24 @@ function ItemSheetContent({
           dueDate: String(data.get("dueDate") ?? "") || null,
           estimatedCostMinor: estimate,
         };
-        await onMutate(
-          item
-            ? { action: "update_item", itemId: item.id, ...common }
-            : { action: "create_item", collectionId, ...common },
-        );
+        if (mode.kind === "follow-up" && sourceEvent) {
+          await onMutate({
+            action: "create_follow_up_task",
+            sourceEventId: sourceEvent.id,
+            collectionId: String(data.get("collectionId") ?? collectionId),
+            title: common.title,
+            description: common.description,
+            status: common.status,
+            dueDate: common.dueDate,
+            estimatedCostMinor: common.estimatedCostMinor,
+          });
+        } else {
+          await onMutate(
+            item
+              ? { action: "update_item", itemId: item.id, ...common }
+              : { action: "create_item", collectionId, ...common },
+          );
+        }
       } else {
         const common = {
           type: "event" as const,
@@ -139,7 +189,7 @@ function ItemSheetContent({
             : { action: "create_item", collectionId, ...common },
         );
       }
-      if (!item) onClose();
+      if (!item && mode.kind === "new") onClose();
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Unable to save the item");
     }
@@ -193,6 +243,13 @@ function ItemSheetContent({
   const canManagePayment = (payment: PaymentRecord) =>
     project?.role === "owner" || payment.createdBy === snapshot.user.id;
 
+  const itemRelations = item
+    ? snapshot.relations.filter(
+        (relation) =>
+          relation.sourceItemId === item.id || relation.targetItemId === item.id,
+      )
+    : [];
+
   return (
     <div className="item-sheet-stack">
       <div className="item-context">
@@ -202,11 +259,24 @@ function ItemSheetContent({
         <span>{collection?.name ?? "Collection"}</span>
       </div>
 
+      {sourceEvent ? (
+        <div className="follow-up-source">
+          <span>Follows from</span>
+          <strong>{sourceEvent.title}</strong>
+        </div>
+      ) : null}
+
       {item ? (
         <div className="item-tabs" role="tablist" aria-label="Item sections">
-          {(["details", "files", "payments"] as const).map((value) => (
+          {(["details", "files", "payments", "relations"] as const).map((value) => (
             <button key={value} type="button" role="tab" aria-selected={tab === value} className={tab === value ? "active" : ""} onClick={() => setTab(value)}>
-              {value === "details" ? "Details" : value === "files" ? `Files (${item.files.length})` : `Payments (${item.payments.length})`}
+              {value === "details"
+                ? "Details"
+                : value === "files"
+                  ? `Files (${item.files.length})`
+                  : value === "payments"
+                    ? `Payments (${item.payments.length})`
+                    : `Relations (${itemRelations.length})`}
             </button>
           ))}
         </div>
@@ -216,6 +286,19 @@ function ItemSheetContent({
 
       {tab === "details" ? (
         <SubmitForm onSubmit={handleItemSubmit}>
+          {mode.kind === "follow-up" && project ? (
+            <Field label="Collection">
+              <select name="collectionId" defaultValue={collectionId}>
+                {snapshot.collections
+                  .filter((candidate) => candidate.projectId === project.id)
+                  .map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
+          ) : null}
           <Field label="Title"><input name="title" defaultValue={item?.title ?? ""} required maxLength={160} /></Field>
           <Field label="Description"><textarea name="description" defaultValue={item?.description ?? ""} maxLength={4000} /></Field>
           <div className="form-columns">
@@ -249,7 +332,20 @@ function ItemSheetContent({
             </div>
           ) : null}
           <div className="item-form-actions">
-            {item ? <button className="button button-danger" type="button" onClick={() => setConfirmDelete(true)}>Delete {type}</button> : <span />}
+            {item ? (
+              <div className="item-secondary-actions">
+                <button className="button button-danger" type="button" onClick={() => setConfirmDelete(true)}>Delete {type}</button>
+                {item.type === "event" ? (
+                  <button
+                    className="button button-secondary"
+                    type="button"
+                    onClick={() => onStartFollowUp(item.id, item.collectionId)}
+                  >
+                    Create follow-up task
+                  </button>
+                ) : null}
+              </div>
+            ) : <span />}
             <div><button className="button button-secondary" type="button" onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending}>{pending ? "Saving…" : item ? "Save changes" : `Create ${type}`}</button></div>
           </div>
         </SubmitForm>
@@ -288,6 +384,17 @@ function ItemSheetContent({
             {!pinnedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, archives, or other project material to this item." /> : null}
           </div>
         </section>
+      ) : null}
+
+      {tab === "relations" && item ? (
+        <ItemRelationsPanel
+          snapshot={snapshot}
+          item={item}
+          pending={pending}
+          onMutate={onMutate}
+          onOpenItem={onOpenItem}
+          onError={setLocalError}
+        />
       ) : null}
 
       {tab === "payments" && item ? (

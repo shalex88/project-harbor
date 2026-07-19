@@ -45,3 +45,9 @@ test("past agenda groups use gray-only styling", async () => {
   assert.match(css, /\.agenda-day-past/);
   assert.match(css, /\.agenda-day-past[\s\S]*color:\s*var\(--text-muted\)/);
 });
+
+test("relationship actions remain touch sized on mobile", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  assert.match(css, /\.relation-actions[\s\S]*min-height:\s*44px/);
+  assert.match(css, /\.relation-add-grid/);
+});

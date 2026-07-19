@@ -213,6 +213,10 @@ export const workItemRelations = sqliteTable(
       "work_item_relations_distinct_items_check",
       sql`${table.sourceItemId} <> ${table.targetItemId}`,
     ),
+    check(
+      "work_item_relations_related_order_check",
+      sql`${table.type} <> 'related_to' OR ${table.sourceItemId} < ${table.targetItemId}`,
+    ),
   ],
 );
 

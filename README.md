@@ -1,8 +1,9 @@
 # Project Harbor
 
 Project Harbor is a responsive project-management workspace for organizing
-projects into collections, tracking actionable tasks and dated events, storing
-pinned files, and comparing estimated costs with recorded payments.
+projects into collections, tracking actionable tasks and dated events, linking
+related work, storing pinned files, and comparing estimated costs with recorded
+payments.
 
 ## Prerequisites
 
@@ -52,7 +53,7 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 
 - ChatGPT sign-in and explicit project membership
 - projects with multiple ordered collections
-- independent task and event records
+- distinct task and event records with follow-up, blocking, and related links
 - item files, pinning, payment records, and receipts in R2
 - overview, task, event, timeline, and spending dashboards
 - full desktop and mobile feature parity

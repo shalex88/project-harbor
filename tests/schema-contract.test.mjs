@@ -26,6 +26,7 @@ test("work item relationships are project scoped and reject invalid rows", () =>
   assert.match(migration, /CREATE TABLE `work_item_relations`/);
   assert.match(migration, /work_item_relations_type_check/);
   assert.match(migration, /work_item_relations_distinct_items_check/);
+  assert.match(migration, /work_item_relations_related_order_check/);
   assert.match(migration, /work_item_relations_unique/);
   assert.match(
     migration,
