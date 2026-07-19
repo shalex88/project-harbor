@@ -11,6 +11,10 @@ import {
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import {
+  relationMetadataPhrases,
+  workItemMetadata,
+} from "@/lib/relation-metadata";
+import {
   normalizeAgendaSortOrder,
   sortAgendaEntries,
 } from "./agenda-sort";
@@ -199,7 +203,17 @@ function TaskRow({
       </span>
       <span className="row-title">
         <strong>{item.title}</strong>
-        <small>{projectName(snapshot, item.projectId)} · {collectionName(snapshot, item.collectionId)}</small>
+        <small>
+          {workItemMetadata(
+            [
+              projectName(snapshot, item.projectId),
+              collectionName(snapshot, item.collectionId),
+            ],
+            item.id,
+            snapshot.relations,
+            snapshot.items,
+          )}
+        </small>
       </span>
       <span className="date-chip">{item.dueDate ? prettyDate(item.dueDate) : "No due date"}</span>
       <span className={`status-chip status-${item.status}`}>{statusLabel(item.status)}</span>
@@ -225,7 +239,17 @@ function EventRow({
       </span>
       <span className="row-title">
         <strong>{item.title}</strong>
-        <small>{projectName(snapshot, item.projectId)} · {collectionName(snapshot, item.collectionId)}</small>
+        <small>
+          {workItemMetadata(
+            [
+              projectName(snapshot, item.projectId),
+              collectionName(snapshot, item.collectionId),
+            ],
+            item.id,
+            snapshot.relations,
+            snapshot.items,
+          )}
+        </small>
       </span>
       <span className="row-arrow" aria-hidden="true">›</span>
     </button>
@@ -594,7 +618,17 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                     <button className={`agenda-item agenda-${item.type}`} type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
                       <span>{item.type === "task" ? "Task" : "Event"}</span>
                       <strong>{item.title}</strong>
-                      <small>{projectName(snapshot, item.projectId)} · {collectionName(snapshot, item.collectionId)}</small>
+                      <small>
+                        {workItemMetadata(
+                          [
+                            projectName(snapshot, item.projectId),
+                            collectionName(snapshot, item.collectionId),
+                          ],
+                          item.id,
+                          snapshot.relations,
+                          snapshot.items,
+                        )}
+                      </small>
                     </button>
                   ))}
                 </div>
@@ -609,11 +643,29 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
             <div className={`calendar-day ${date === todayIso() ? "today" : ""} ${mode === "month" && date.slice(0, 7) !== anchor.slice(0, 7) ? "outside" : ""}`} key={date}>
               <span className="calendar-date">{new Date(`${date}T00:00:00Z`).getUTCDate()}</span>
               <div className="calendar-items">
-                {(byDate.get(date) ?? []).map((item) => (
-                  <button type="button" key={item.id} className={`calendar-item calendar-${item.type}`} onClick={() => onOpenItem(item.id)}>
-                    <span>{item.type === "task" ? "✓" : "◷"}</span>{item.title}
-                  </button>
-                ))}
+                {(byDate.get(date) ?? []).map((item) => {
+                  const relationPhrases = relationMetadataPhrases(
+                    item.id,
+                    snapshot.relations,
+                    snapshot.items,
+                  );
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      className={`calendar-item calendar-${item.type}`}
+                      onClick={() => onOpenItem(item.id)}
+                    >
+                      <span aria-hidden="true">
+                        {item.type === "task" ? "✓" : "◷"}
+                      </span>
+                      <strong>{item.title}</strong>
+                      {relationPhrases.length ? (
+                        <small>{relationPhrases.join(" · ")}</small>
+                      ) : null}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           ))}
@@ -755,7 +807,17 @@ export function SpendingDashboard({ snapshot, onOpenItem }: DashboardProps) {
           <div className="row-list compact-list">
             {overEstimate.map((item) => (
               <button className="money-row" type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
-                <span className="row-title"><strong>{item.title}</strong><small>{projectName(snapshot, item.projectId)}</small></span>
+                <span className="row-title">
+                  <strong>{item.title}</strong>
+                  <small>
+                    {workItemMetadata(
+                      [projectName(snapshot, item.projectId)],
+                      item.id,
+                      snapshot.relations,
+                      snapshot.items,
+                    )}
+                  </small>
+                </span>
                 <span className="money-over">+{formatMoney(item.varianceMinor ?? 0, projectCurrency(snapshot, item.projectId))}</span>
               </button>
             ))}

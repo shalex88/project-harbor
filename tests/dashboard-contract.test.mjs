@@ -53,3 +53,18 @@ test("agenda marks only dates before the browser-local current date as past", ()
   assert.match(source, /agenda-day-past/);
   assert.doesNotMatch(source, />Past</);
 });
+
+test("every global dashboard work-item surface renders relation metadata", () => {
+  assert.match(source, /@\/lib\/relation-metadata/);
+  assert.match(source, /function TaskRow[\s\S]*?workItemMetadata/);
+  assert.match(source, /function EventRow[\s\S]*?workItemMetadata/);
+  assert.match(source, /agenda-item[\s\S]*?workItemMetadata/);
+  assert.match(source, /calendar-item[\s\S]*?relationMetadataPhrases/);
+  assert.match(source, /className="money-row"[\s\S]*?workItemMetadata/);
+});
+
+test("payment-history metadata remains payment focused", () => {
+  const paymentFeed = source.slice(source.indexOf('className="payment-feed"'));
+  assert.ok(paymentFeed.length > 0, "payment feed must exist");
+  assert.doesNotMatch(paymentFeed, /workItemMetadata|relationMetadataPhrases/);
+});
