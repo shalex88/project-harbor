@@ -37,6 +37,12 @@ test("project workspace supports members invitations and collections", () => {
   }
 });
 
+test("project collection work-item rows show relation metadata", () => {
+  assert.match(projectSource, /@\/lib\/relation-metadata/);
+  assert.match(projectSource, /tasks\.map[\s\S]*?workItemMetadata/);
+  assert.match(projectSource, /events\.map[\s\S]*?workItemMetadata/);
+});
+
 test("item sheets expose relation browsing and management", () => {
   for (const label of [
     "Relations",

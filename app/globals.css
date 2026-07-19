@@ -807,6 +807,14 @@ a {
   font-size: 10px;
 }
 
+.row-title small,
+.agenda-item small {
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.45;
+}
+
 .status-todo {
   border-color: var(--border-bright);
 }
@@ -1041,8 +1049,12 @@ a {
 }
 
 .calendar-item {
+  display: grid;
   overflow: hidden;
-  min-height: 28px;
+  min-height: 32px;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 4px;
   border: 1px solid var(--border-bright);
   border-radius: 5px;
   background: var(--selected);
@@ -1050,9 +1062,31 @@ a {
   cursor: pointer;
   padding: 4px 6px;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
   font-size: 10px;
+}
+
+.calendar-item > span {
+  grid-row: span 2;
+  align-self: center;
+}
+
+.calendar-item strong,
+.calendar-item small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.calendar-item strong {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.calendar-item small {
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
 }
 
 .calendar-event {

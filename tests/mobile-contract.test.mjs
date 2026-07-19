@@ -51,3 +51,10 @@ test("relationship actions remain touch sized on mobile", async () => {
   assert.match(css, /\.relation-actions[\s\S]*min-height:\s*44px/);
   assert.match(css, /\.relation-add-grid/);
 });
+
+test("relation metadata wraps in rows and compact calendar cells", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  assert.match(css, /\.row-title small,[\s\S]*?white-space:\s*normal/);
+  assert.match(css, /\.calendar-item small[\s\S]*?white-space:\s*normal/);
+  assert.match(css, /\.calendar-item[\s\S]*?grid-template-columns/);
+});
