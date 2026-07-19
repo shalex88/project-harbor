@@ -1187,13 +1187,16 @@ export async function applyWorkspaceMutation(
     }
     case "delete_relation": {
       const relation = await first<{ project_id: string }>(
-        "SELECT project_id FROM work_item_relations WHERE id = ?",
+        `SELECT wir.project_id
+         FROM work_item_relations wir
+         JOIN project_members current ON current.project_id = wir.project_id
+         WHERE wir.id = ? AND current.user_id = ?`,
         mutation.relationId,
+        user.id,
       );
       if (!relation) {
         throw new DomainError("Relationship not found", "not_found");
       }
-      await requireProjectAccess(user.id, relation.project_id);
       await run(
         "DELETE FROM work_item_relations WHERE id = ?",
         mutation.relationId,
