@@ -110,3 +110,30 @@ test("missing linked items and empty metadata parts are ignored", () => {
     "",
   );
 });
+
+test("title ordering is independent of the runtime locale", () => {
+  const unicodeItems = [
+    { id: "current", title: "Current" },
+    { id: "zulu", title: "Zulu" },
+    { id: "angstrom", title: "Ångström" },
+  ];
+  const unicodeRelations = [
+    {
+      id: "relation-angstrom",
+      type: "related_to",
+      sourceItemId: "current",
+      targetItemId: "angstrom",
+    },
+    {
+      id: "relation-zulu",
+      type: "related_to",
+      sourceItemId: "current",
+      targetItemId: "zulu",
+    },
+  ];
+
+  assert.deepEqual(
+    relationMetadataPhrases("current", unicodeRelations, unicodeItems),
+    ["Related to Zulu", "Related to Ångström"],
+  );
+});

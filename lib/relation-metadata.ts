@@ -10,6 +10,10 @@ type RelationPhrase = {
   id: string;
 };
 
+function compareCodeUnits(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function relationMetadataPhrases(
   itemId: string,
   relations: WorkItemRelationRecord[],
@@ -51,9 +55,9 @@ export function relationMetadataPhrases(
     })
     .sort(
       (a, b) =>
-        a.type.localeCompare(b.type) ||
-        a.title.localeCompare(b.title) ||
-        a.id.localeCompare(b.id),
+        compareCodeUnits(a.type, b.type) ||
+        compareCodeUnits(a.title, b.title) ||
+        compareCodeUnits(a.id, b.id),
     )
     .map(({ phrase }) => phrase);
 }
