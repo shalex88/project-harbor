@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { chatGPTSignOutPath } from "@/app/chatgpt-auth-paths";
 import type { AppUser, ProjectRecord } from "@/lib/domain";
+import { formatCurrentDate } from "./current-date";
 import { Sheet } from "./ui";
 
 export type AppRoute = "overview" | "tasks" | "events" | "timeline" | "spending" | "project";
@@ -22,6 +23,18 @@ const MOBILE_ITEMS: Array<{ route: AppRoute | "more"; label: string; mark: strin
   { route: "timeline", label: "Timeline", mark: "▦" },
   { route: "more", label: "More", mark: "•••" },
 ];
+
+let cachedCurrentDate = "";
+
+const subscribeToCurrentDate = (onStoreChange: () => void) => {
+  if (cachedCurrentDate === "") {
+    cachedCurrentDate = formatCurrentDate(new Date());
+    queueMicrotask(onStoreChange);
+  }
+  return () => {};
+};
+const getCurrentDateSnapshot = () => cachedCurrentDate;
+const getCurrentDateServerSnapshot = () => "";
 
 export function AppShell({
   user,
@@ -47,6 +60,11 @@ export function AppShell({
   onPrimaryAction: () => void;
 }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const currentDate = useSyncExternalStore(
+    subscribeToCurrentDate,
+    getCurrentDateSnapshot,
+    getCurrentDateServerSnapshot,
+  );
   const initials = useMemo(
     () =>
       user.displayName
@@ -68,7 +86,10 @@ export function AppShell({
       <aside className="desktop-sidebar" aria-label="Primary navigation">
         <button className="brand" type="button" onClick={() => navigate("overview")}>
           <span className="brand-mark" aria-hidden="true">⚓</span>
-          <span>Project Harbor</span>
+          <span className="brand-copy">
+            <span>Project Harbor</span>
+            {currentDate ? <span className="brand-date">{currentDate}</span> : null}
+          </span>
         </button>
         <nav className="sidebar-nav">
           <p className="nav-heading">Navigation</p>

@@ -12,6 +12,12 @@ test("mobile navigation exposes every primary dashboard", async () => {
   assert.match(source, /aria-label="Mobile navigation"/);
 });
 
+test("desktop brand displays the browser-local current date", async () => {
+  const source = await readFile(new URL("app/components/app-shell.tsx", root), "utf8");
+  assert.match(source, /formatCurrentDate\(new Date\(\)\)/);
+  assert.match(source, /className="brand-date"/);
+});
+
 test("responsive styles provide bottom navigation and full-screen mobile sheets", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(css, /\.mobile-nav/);
@@ -32,4 +38,10 @@ test("tablet widths retain primary navigation when the sidebar collapses", async
 test("reduced motion is respected", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
+});
+
+test("past agenda groups use gray-only styling", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  assert.match(css, /\.agenda-day-past/);
+  assert.match(css, /\.agenda-day-past[\s\S]*color:\s*var\(--text-muted\)/);
 });
