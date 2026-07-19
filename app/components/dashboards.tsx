@@ -31,8 +31,16 @@ const TIMELINE_MODES = [
   { id: "agenda", label: "Agenda" },
 ] as const;
 
-const subscribeToCurrentDate = () => () => {};
-const getCurrentDateSnapshot = () => localDateIso(new Date());
+let cachedCurrentDate = "";
+
+const subscribeToCurrentDate = (onStoreChange: () => void) => {
+  if (cachedCurrentDate === "") {
+    cachedCurrentDate = localDateIso(new Date());
+    queueMicrotask(onStoreChange);
+  }
+  return () => {};
+};
+const getCurrentDateSnapshot = () => cachedCurrentDate;
 const getCurrentDateServerSnapshot = () => "";
 
 function useUrlFilter(
