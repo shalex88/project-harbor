@@ -81,3 +81,10 @@ test("workspace snapshots load authorized relationship records", () => {
   assert.match(repository, /relations: relationRows\.map/);
   assert.match(repository, /JOIN project_members current ON current\.project_id = wir\.project_id/);
 });
+
+test("preview persistence and seed data use only todo and done task states", () => {
+  assert.match(repository, /status IN \('todo','done'\)/);
+  assert.doesNotMatch(repository, /status IN \('todo','in_progress','done'\)/);
+  assert.doesNotMatch(repository, /^\s+"in_progress",$/m);
+  assert.doesNotMatch(repository, /"todo" \| "in_progress" \| "done"/);
+});

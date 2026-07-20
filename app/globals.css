@@ -843,11 +843,6 @@ strong.work-item-title {
   border-color: var(--border-bright);
 }
 
-.status-in_progress {
-  border-color: rgba(59, 130, 246, 0.75);
-  color: #93c5fd;
-}
-
 .status-done {
   border-color: rgba(94, 234, 212, 0.7);
   color: var(--seafoam);

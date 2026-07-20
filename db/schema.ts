@@ -147,7 +147,7 @@ export const workItems = sqliteTable(
     check("work_items_type_check", sql`${table.type} IN ('task', 'event')`),
     check(
       "work_items_status_check",
-      sql`${table.status} IS NULL OR ${table.status} IN ('todo', 'in_progress', 'done')`,
+      sql`${table.status} IS NULL OR ${table.status} IN ('todo', 'done')`,
     ),
     check(
       "work_items_type_fields_check",

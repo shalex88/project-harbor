@@ -12,7 +12,7 @@ export class DomainError extends Error {
   }
 }
 
-export type TaskStatus = "todo" | "in_progress" | "done";
+export type TaskStatus = "todo" | "done";
 export type ItemType = "task" | "event";
 export type RelationType = "follows_from" | "blocks" | "related_to";
 export type ProjectRole = "owner" | "member";
@@ -252,7 +252,7 @@ export type WorkspaceMutation =
   | { action: "delete_payment"; paymentId: string };
 
 export function validateTaskStatus(value: unknown): TaskStatus {
-  if (value === "todo" || value === "in_progress" || value === "done") {
+  if (value === "todo" || value === "done") {
     return value;
   }
   throw new DomainError("invalid task status");

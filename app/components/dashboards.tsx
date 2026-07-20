@@ -117,7 +117,7 @@ function projectCurrency(snapshot: WorkspaceSnapshot, projectId: string): string
 }
 
 function statusLabel(status: TaskRecord["status"]): string {
-  return status === "in_progress" ? "In progress" : status === "done" ? "Done" : "To do";
+  return status === "done" ? "Done" : "To do";
 }
 
 function Panel({
@@ -300,7 +300,6 @@ export function OverviewDashboard({ snapshot, onOpenItem, onNavigate }: Dashboar
         <FilterSelect label="Filter overview by task status" value={taskStatus} onChange={setTaskStatus}>
           <option value="open">Open tasks</option>
           <option value="todo">To do</option>
-          <option value="in_progress">In progress</option>
         </FilterSelect>
         <button className="button button-secondary filter-clear" type="button" onClick={() => { setProjectId("all"); setCollectionId("all"); setTaskStatus("open"); }}>Clear</button>
       </div>
@@ -342,7 +341,6 @@ export function OverviewDashboard({ snapshot, onOpenItem, onNavigate }: Dashboar
 export function TasksDashboard({ snapshot, onOpenItem }: DashboardProps) {
   const [projectId, setProjectId] = useUrlFilter("project", "all");
   const [collectionId, setCollectionId] = useUrlFilter("collection", "all");
-  const [status, setStatus] = useUrlFilter("status", "open");
   const [due, setDue] = useUrlFilter("due", "all");
   const [dueFrom, setDueFrom] = useUrlFilter("from", "");
   const [dueTo, setDueTo] = useUrlFilter("to", "");
@@ -356,8 +354,6 @@ export function TasksDashboard({ snapshot, onOpenItem }: DashboardProps) {
     if (item.type !== "task") return false;
     if (projectId !== "all" && item.projectId !== projectId) return false;
     if (collectionId !== "all" && item.collectionId !== collectionId) return false;
-    if (status === "open" && item.status === "done") return false;
-    if (status !== "all" && status !== "open" && item.status !== status) return false;
     if (due === "week" && (!item.dueDate || item.dueDate < today || item.dueDate > weekEnd)) return false;
     if (due === "overdue" && (!item.dueDate || item.dueDate >= today || item.status === "done")) return false;
     if (due === "none" && item.dueDate) return false;
@@ -365,6 +361,8 @@ export function TasksDashboard({ snapshot, onOpenItem }: DashboardProps) {
     if (dueTo && (!item.dueDate || item.dueDate > dueTo)) return false;
     return true;
   });
+  const todoTasks = tasks.filter((item) => item.status === "todo");
+  const doneTasks = tasks.filter((item) => item.status === "done");
 
   return (
     <div className="dashboard-stack">
@@ -377,13 +375,6 @@ export function TasksDashboard({ snapshot, onOpenItem }: DashboardProps) {
           <option value="all">All collections</option>
           {visibleCollections.map((collection) => <option value={collection.id} key={collection.id}>{collection.name}</option>)}
         </FilterSelect>
-        <FilterSelect label="Filter by status" value={status} onChange={setStatus}>
-          <option value="open">Open tasks</option>
-          <option value="all">All statuses</option>
-          <option value="todo">To do</option>
-          <option value="in_progress">In progress</option>
-          <option value="done">Done</option>
-        </FilterSelect>
         <FilterSelect label="Filter by due date" value={due} onChange={setDue}>
           <option value="all">Any due date</option>
           <option value="week">Due this week</option>
@@ -392,14 +383,22 @@ export function TasksDashboard({ snapshot, onOpenItem }: DashboardProps) {
         </FilterSelect>
         <FilterDate label="Due date from" value={dueFrom} onChange={setDueFrom} />
         <FilterDate label="Due date to" value={dueTo} onChange={setDueTo} />
-        <button className="button button-secondary filter-clear" type="button" onClick={() => { setProjectId("all"); setCollectionId("all"); setStatus("open"); setDue("all"); setDueFrom(""); setDueTo(""); }}>Clear</button>
+        <button className="button button-secondary filter-clear" type="button" onClick={() => { setProjectId("all"); setCollectionId("all"); setDue("all"); setDueFrom(""); setDueTo(""); }}>Clear</button>
       </div>
-      <Panel title="Tasks" count={tasks.length}>
-        <div className="row-list">
-          {tasks.map((item) => <TaskRow key={item.id} item={item} snapshot={snapshot} onOpen={() => onOpenItem(item.id)} />)}
-          {!tasks.length ? <EmptyState title="No tasks match" description="Change a filter or create a task inside a project collection." /> : null}
-        </div>
-      </Panel>
+      <div className="two-column-panels">
+        <Panel title="To do" count={todoTasks.length}>
+          <div className="row-list">
+            {todoTasks.map((item) => <TaskRow key={item.id} item={item} snapshot={snapshot} onOpen={() => onOpenItem(item.id)} />)}
+            {!todoTasks.length ? <EmptyState title="No to-do tasks" description="Tasks ready for action will appear here." /> : null}
+          </div>
+        </Panel>
+        <Panel title="Done" count={doneTasks.length}>
+          <div className="row-list">
+            {doneTasks.map((item) => <TaskRow key={item.id} item={item} snapshot={snapshot} onOpen={() => onOpenItem(item.id)} />)}
+            {!doneTasks.length ? <EmptyState title="No completed tasks" description="Completed tasks will appear here." /> : null}
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }
@@ -573,7 +572,6 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
         <FilterSelect label="Filter timeline by task status" value={taskStatus} onChange={setTaskStatus}>
           <option value="all">Any task status</option>
           <option value="todo">To do</option>
-          <option value="in_progress">In progress</option>
           <option value="done">Done</option>
         </FilterSelect>
         <FilterDate label="Timeline date from" value={dateFrom} onChange={setDateFrom} />
