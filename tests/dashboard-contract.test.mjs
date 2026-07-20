@@ -86,8 +86,14 @@ test("tasks dashboard separates to-do and done tasks into two panels", () => {
   assert.match(tasksDashboard, /className="two-column-panels"/);
   assert.match(tasksDashboard, /title="To do"/);
   assert.match(tasksDashboard, /title="Done"/);
-  assert.match(tasksDashboard, /item\.status === "todo"/);
-  assert.match(tasksDashboard, /item\.status === "done"/);
+  assert.match(
+    tasksDashboard,
+    /const todoTasks = tasks\.filter\(\(item\) => item\.status === "todo"\)/,
+  );
+  assert.match(
+    tasksDashboard,
+    /const doneTasks = tasks\.filter\(\(item\) => item\.status === "done"\)/,
+  );
   assert.doesNotMatch(tasksDashboard, /Filter by status/);
 });
 
