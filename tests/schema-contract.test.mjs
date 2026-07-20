@@ -67,5 +67,5 @@ test("task status migration maps in-progress rows before enforcing two states", 
 
 test("local setup applies every checked-in D1 migration", () => {
   assert.match(packageJson.scripts["dev:setup"], /d1 migrations apply/);
-  assert.equal(localD1Config.d1_databases[0].migrations_dir, "drizzle");
+  assert.equal(localD1Config.d1_databases[0].migrations_dir, "../drizzle");
 });
