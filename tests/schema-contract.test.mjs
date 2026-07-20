@@ -3,6 +3,15 @@ import { readFile, readdir } from "node:fs/promises";
 import test from "node:test";
 
 const drizzle = new URL("../drizzle/", import.meta.url);
+const packageJson = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
+const localD1Config = JSON.parse(
+  await readFile(
+    new URL("../scripts/local-d1.wrangler.json", import.meta.url),
+    "utf8",
+  ),
+);
 const migrationFiles = (await readdir(drizzle))
   .filter((file) => file.endsWith(".sql"))
   .sort();
@@ -54,4 +63,9 @@ test("task status migration maps in-progress rows before enforcing two states", 
     constraintIndex > updateIndex,
     "normalization must precede the new constraint",
   );
+});
+
+test("local setup applies every checked-in D1 migration", () => {
+  assert.match(packageJson.scripts["dev:setup"], /d1 migrations apply/);
+  assert.equal(localD1Config.d1_databases[0].migrations_dir, "drizzle");
 });

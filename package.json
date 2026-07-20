@@ -8,7 +8,7 @@
   "scripts": {
     "install:ci": "bash scripts/install-ci.sh",
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
-    "dev:setup": "bash scripts/sites-env.sh -- wrangler d1 execute site-creator-d1 --config scripts/local-d1.wrangler.json --local --persist-to .wrangler/state --file=drizzle/0000_tired_squirrel_girl.sql",
+    "dev:setup": "bash scripts/sites-env.sh -- wrangler d1 migrations apply site-creator-d1 --config scripts/local-d1.wrangler.json --local --persist-to .wrangler/state",
     "build": "bash scripts/build-verified.sh",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "npm run build && node --experimental-strip-types --test tests/*.test.mjs",
