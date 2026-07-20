@@ -153,7 +153,7 @@ function ItemSheetContent({
           type: "task" as const,
           title: String(data.get("title") ?? ""),
           description: String(data.get("description") ?? ""),
-          status: String(data.get("status") ?? "todo") as "todo" | "in_progress" | "done",
+          status: String(data.get("status") ?? "todo") as "todo" | "done",
           dueDate: String(data.get("dueDate") ?? "") || null,
           estimatedCostMinor: estimate,
         };
@@ -307,7 +307,6 @@ function ItemSheetContent({
                 <Field label="Status">
                   <select name="status" defaultValue={item?.type === "task" ? item.status : "todo"}>
                     <option value="todo">To do</option>
-                    <option value="in_progress">In progress</option>
                     <option value="done">Done</option>
                   </select>
                 </Field>
