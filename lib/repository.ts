@@ -43,7 +43,7 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','member')), joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(project_id,user_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_invitations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, accepted_at TEXT, UNIQUE(project_id,email), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(invited_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'cyan', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
-  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','in_progress','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
   `CREATE TABLE IF NOT EXISTS work_item_relations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('follows_from','blocks','related_to')), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_item_id <> target_item_id), CHECK(type <> 'related_to' OR source_item_id < target_item_id), UNIQUE(project_id,type,source_item_id,target_item_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(source_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(target_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
@@ -211,7 +211,7 @@ async function ensureDevelopmentSeed(user: AppUser): Promise<void> {
       "task",
       "Finalize onboarding flow",
       "Resolve the last interaction notes before the beta handoff.",
-      "in_progress",
+      "todo",
       "2026-07-16",
       null,
       12_000,
@@ -598,7 +598,7 @@ export async function loadWorkspaceSnapshot(
     type: "task" | "event";
     title: string;
     description: string;
-    status: "todo" | "in_progress" | "done" | null;
+    status: "todo" | "done" | null;
     due_date: string | null;
     occurrence_date: string | null;
     estimated_cost_minor: number | null;

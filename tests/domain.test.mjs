@@ -17,10 +17,10 @@ import {
   validateRelationType,
 } from "../lib/domain.ts";
 
-test("task status accepts only todo, in_progress, and done", () => {
+test("task status accepts only todo and done", () => {
   assert.equal(validateTaskStatus("todo"), "todo");
-  assert.equal(validateTaskStatus("in_progress"), "in_progress");
   assert.equal(validateTaskStatus("done"), "done");
+  assert.throws(() => validateTaskStatus("in_progress"), /invalid task status/);
   assert.throws(() => validateTaskStatus("review"), /invalid task status/);
 });
 
@@ -99,7 +99,7 @@ test("timeline excludes undated tasks and sorts dated tasks with events", () => 
       title: "Release notes",
       dueDate: "2026-07-18",
       occurrenceDate: null,
-      status: "in_progress",
+      status: "todo",
     },
     {
       id: "event-1",
