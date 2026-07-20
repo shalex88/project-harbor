@@ -10,6 +10,10 @@ const itemSheetSource = await readFile(
   new URL("../app/components/item-sheet.tsx", import.meta.url),
   "utf8",
 ).catch(() => "");
+const taskStatusSource = await readFile(
+  new URL("../app/components/task-status-chip.tsx", import.meta.url),
+  "utf8",
+).catch(() => "");
 const styles = await readFile(
   new URL("../app/globals.css", import.meta.url),
   "utf8",
@@ -105,4 +109,13 @@ test("task controls expose no in-progress option or styling", () => {
     /"todo" \| "in_progress" \| "done"/,
   );
   assert.doesNotMatch(styles, /\.status-in_progress/);
+});
+
+test("shared task status chip owns canonical dashboard status presentation", () => {
+  assert.ok(taskStatusSource.length > 0, "task status component must exist");
+  assert.match(taskStatusSource, /TaskRecord\["status"\]/);
+  assert.match(taskStatusSource, /status === "done" \? "Done" : "To do"/);
+  assert.match(taskStatusSource, /status-chip/);
+  assert.match(taskStatusSource, /status-\$\{status\}/);
+  assert.match(taskStatusSource, /status-chip-compact/);
 });
