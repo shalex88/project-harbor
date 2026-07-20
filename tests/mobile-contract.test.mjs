@@ -58,3 +58,17 @@ test("relation metadata wraps in rows and compact calendar cells", async () => {
   assert.match(css, /\.calendar-item small[\s\S]*?white-space:\s*normal/);
   assert.match(css, /\.calendar-item[\s\S]*?grid-template-columns/);
 });
+
+test("responsive task status styles use readable labels instead of checkboxes", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  assert.doesNotMatch(css, /\.task-check/);
+  assert.match(css, /\.status-chip-compact/);
+  assert.match(css, /\.calendar-item \.status-chip/);
+  assert.match(css, /\.agenda-item \.status-chip/);
+  assert.match(
+    css,
+    /\.collection-item-list > button\s*\{[\s\S]*?grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+16px;/,
+  );
+  assert.doesNotMatch(css, /\.agenda-item > span\s*\{/);
+  assert.match(css, /\.agenda-event > span\s*\{/);
+});

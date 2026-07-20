@@ -715,7 +715,7 @@ a {
 
 .status-chip-compact {
   min-height: 20px;
-  padding: 2px 4px;
+  padding: 1px 5px;
   font-size: 9px;
   line-height: 1.2;
 }
@@ -774,22 +774,6 @@ a {
 .payment-feed > button:hover {
   background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 3px 0 var(--cyan);
-}
-
-.task-check {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid var(--text-muted);
-  border-radius: 5px;
-  color: var(--shell);
-  font-size: 12px;
-}
-
-.task-check.complete {
-  border-color: var(--seafoam);
-  background: var(--seafoam);
 }
 
 .row-title {
@@ -965,7 +949,8 @@ strong.work-item-title {
 }
 
 .agenda-day-past > header strong,
-.agenda-day-past .agenda-item > span,
+.agenda-day-past .agenda-event > span,
+.agenda-day-past .agenda-item .status-chip,
 .agenda-day-past .agenda-item .work-item-title,
 .agenda-day-past .agenda-item small {
   color: var(--text-muted);
@@ -1000,7 +985,7 @@ strong.work-item-title {
   display: grid;
   width: 100%;
   min-height: 70px;
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 12px;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -1015,7 +1000,7 @@ strong.work-item-title {
   border-bottom: 0;
 }
 
-.agenda-item > span {
+.agenda-event > span {
   grid-row: span 2;
   align-self: center;
   color: var(--cyan);
@@ -1026,6 +1011,12 @@ strong.work-item-title {
 
 .agenda-event > span {
   color: var(--seafoam);
+}
+
+.agenda-item .status-chip {
+  grid-row: span 2;
+  justify-self: start;
+  align-self: center;
 }
 
 .agenda-item small {
@@ -1095,6 +1086,10 @@ strong.work-item-title {
 .calendar-item > span {
   grid-row: span 2;
   align-self: center;
+}
+
+.calendar-item .status-chip {
+  align-self: start;
 }
 
 .calendar-item > .status-chip-compact {
@@ -1359,7 +1354,7 @@ strong.work-item-title {
 .collection-item-list > button {
   display: grid;
   min-height: 68px;
-  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  grid-template-columns: auto minmax(0, 1fr) 16px;
   align-items: center;
   gap: 12px;
   border: 0;
