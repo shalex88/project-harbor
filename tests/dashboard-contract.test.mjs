@@ -119,3 +119,20 @@ test("shared task status chip owns canonical dashboard status presentation", () 
   assert.match(taskStatusSource, /status-\$\{status\}/);
   assert.match(taskStatusSource, /status-chip-compact/);
 });
+
+test("global dashboards use one shared task status indicator", () => {
+  assert.match(source, /import \{ TaskStatusChip \} from "\.\/task-status-chip"/);
+  assert.doesNotMatch(source, /task-check/);
+  assert.match(source, /function TaskRow[\s\S]*?<TaskStatusChip status=\{item\.status\}/);
+  assert.match(source, /className="money-row"[\s\S]*?item\.type === "task"[\s\S]*?<TaskStatusChip/);
+});
+
+test("every timeline mode shows explicit task status labels", () => {
+  const timeline = source.slice(
+    source.indexOf("export function TimelineDashboard"),
+    source.indexOf("export function SpendingDashboard"),
+  );
+  assert.match(timeline, /agenda-item[\s\S]*?item\.type === "task"[\s\S]*?<TaskStatusChip status=\{item\.status\}/);
+  assert.match(timeline, /calendar-item[\s\S]*?item\.type === "task"[\s\S]*?<TaskStatusChip status=\{item\.status\} compact/);
+  assert.doesNotMatch(timeline, /item\.type === "task" \? "✓"/);
+});
