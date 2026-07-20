@@ -713,6 +713,13 @@ a {
   white-space: nowrap;
 }
 
+.status-chip-compact {
+  min-height: 20px;
+  padding: 1px 5px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+
 .text-action {
   min-height: 36px;
   border: 0;
@@ -746,7 +753,7 @@ a {
 }
 
 .task-row {
-  grid-template-columns: 24px minmax(160px, 1fr) auto auto 16px;
+  grid-template-columns: minmax(160px, 1fr) auto auto 16px;
 }
 
 .event-row {
@@ -767,22 +774,6 @@ a {
 .payment-feed > button:hover {
   background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 3px 0 var(--cyan);
-}
-
-.task-check {
-  display: grid;
-  width: 20px;
-  height: 20px;
-  place-items: center;
-  border: 1px solid var(--text-muted);
-  border-radius: 5px;
-  color: var(--shell);
-  font-size: 12px;
-}
-
-.task-check.complete {
-  border-color: var(--seafoam);
-  background: var(--seafoam);
 }
 
 .row-title {
@@ -958,7 +949,8 @@ strong.work-item-title {
 }
 
 .agenda-day-past > header strong,
-.agenda-day-past .agenda-item > span,
+.agenda-day-past .agenda-event > span,
+.agenda-day-past .agenda-item .status-chip,
 .agenda-day-past .agenda-item .work-item-title,
 .agenda-day-past .agenda-item small {
   color: var(--text-muted);
@@ -993,7 +985,7 @@ strong.work-item-title {
   display: grid;
   width: 100%;
   min-height: 70px;
-  grid-template-columns: 58px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 12px;
   border: 0;
   border-bottom: 1px solid var(--border);
@@ -1008,7 +1000,7 @@ strong.work-item-title {
   border-bottom: 0;
 }
 
-.agenda-item > span {
+.agenda-event > span {
   grid-row: span 2;
   align-self: center;
   color: var(--cyan);
@@ -1017,8 +1009,14 @@ strong.work-item-title {
   text-transform: uppercase;
 }
 
-.agenda-event > span {
-  color: var(--seafoam);
+.agenda-event {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
+.agenda-item .status-chip {
+  grid-row: span 2;
+  justify-self: start;
+  align-self: center;
 }
 
 .agenda-item small {
@@ -1071,7 +1069,7 @@ strong.work-item-title {
   display: grid;
   overflow: hidden;
   min-height: 32px;
-  grid-template-columns: 12px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 2px 4px;
   border: 1px solid var(--border-bright);
@@ -1088,6 +1086,15 @@ strong.work-item-title {
 .calendar-item > span {
   grid-row: span 2;
   align-self: center;
+}
+
+.calendar-item .status-chip {
+  align-self: start;
+}
+
+.calendar-item > .status-chip-compact {
+  grid-row: auto;
+  justify-self: start;
 }
 
 .calendar-item strong,
@@ -1117,6 +1124,7 @@ strong.work-item-title {
 
 .calendar-event {
   border-color: rgba(94, 234, 212, 0.45);
+  grid-template-columns: 12px minmax(0, 1fr);
 }
 
 .currency-groups {
@@ -1346,7 +1354,7 @@ strong.work-item-title {
 .collection-item-list > button {
   display: grid;
   min-height: 68px;
-  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  grid-template-columns: auto minmax(0, 1fr) 16px;
   align-items: center;
   gap: 12px;
   border: 0;
@@ -2274,17 +2282,17 @@ strong.work-item-title {
 
   .task-row {
     min-height: 90px;
-    grid-template-columns: 24px minmax(0, 1fr) 16px;
+    grid-template-columns: minmax(0, 1fr) 16px;
   }
 
   .task-row .date-chip,
   .task-row .status-chip {
-    grid-column: 2;
+    grid-column: 1;
     justify-self: start;
   }
 
   .task-row .row-arrow {
-    grid-column: 3;
+    grid-column: 2;
     grid-row: 1 / span 3;
   }
 

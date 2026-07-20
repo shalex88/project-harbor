@@ -20,6 +20,7 @@ import {
 } from "./agenda-sort";
 import { isPastAgendaDate } from "./agenda-date-state";
 import { localDateIso } from "./current-date";
+import { TaskStatusChip } from "./task-status-chip";
 import { EmptyState, MetricCard } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
 import type { AppRoute } from "./app-shell";
@@ -116,10 +117,6 @@ function projectCurrency(snapshot: WorkspaceSnapshot, projectId: string): string
   return snapshot.projects.find((project) => project.id === projectId)?.currency ?? "USD";
 }
 
-function statusLabel(status: TaskRecord["status"]): string {
-  return status === "done" ? "Done" : "To do";
-}
-
 function Panel({
   title,
   count,
@@ -199,9 +196,6 @@ function TaskRow({
 }) {
   return (
     <button className="task-row" type="button" onClick={onOpen}>
-      <span className={`task-check ${item.status === "done" ? "complete" : ""}`} aria-hidden="true">
-        {item.status === "done" ? "✓" : ""}
-      </span>
       <span className="row-title">
         <WorkItemTitle item={item} />
         <small>
@@ -217,7 +211,7 @@ function TaskRow({
         </small>
       </span>
       <span className="date-chip">{item.dueDate ? prettyDate(item.dueDate) : "No due date"}</span>
-      <span className={`status-chip status-${item.status}`}>{statusLabel(item.status)}</span>
+      <TaskStatusChip status={item.status} />
       <span className="row-arrow" aria-hidden="true">›</span>
     </button>
   );
@@ -615,7 +609,11 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                 <div>
                   {items.map((item) => (
                     <button className={`agenda-item agenda-${item.type}`} type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
-                      <span>{item.type === "task" ? "Task" : "Event"}</span>
+                      {item.type === "task" ? (
+                        <TaskStatusChip status={item.status} />
+                      ) : (
+                        <span>Event</span>
+                      )}
                       <WorkItemTitle item={item} />
                       <small>
                         {workItemMetadata(
@@ -655,9 +653,11 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                       className={`calendar-item calendar-${item.type}`}
                       onClick={() => onOpenItem(item.id)}
                     >
-                      <span aria-hidden="true">
-                        {item.type === "task" ? "✓" : "◷"}
-                      </span>
+                      {item.type === "task" ? (
+                        <TaskStatusChip status={item.status} compact />
+                      ) : (
+                        <span aria-hidden="true">◷</span>
+                      )}
                       <WorkItemTitle item={item} />
                       {relationPhrases.length ? (
                         <small>{relationPhrases.join(" · ")}</small>
@@ -817,6 +817,9 @@ export function SpendingDashboard({ snapshot, onOpenItem }: DashboardProps) {
                     )}
                   </small>
                 </span>
+                {item.type === "task" ? (
+                  <TaskStatusChip status={item.status} />
+                ) : null}
                 <span className="money-over">+{formatMoney(item.varianceMinor ?? 0, projectCurrency(snapshot, item.projectId))}</span>
               </button>
             ))}
