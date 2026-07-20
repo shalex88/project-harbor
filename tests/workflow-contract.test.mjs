@@ -43,6 +43,13 @@ test("project collection work-item rows show relation metadata", () => {
   assert.match(projectSource, /events\.map[\s\S]*?workItemMetadata/);
 });
 
+test("project task rows use one shared status indicator", () => {
+  assert.match(projectSource, /import \{ TaskStatusChip \} from "\.\/task-status-chip"/);
+  assert.doesNotMatch(projectSource, /task-check/);
+  assert.match(projectSource, /tasks\.map[\s\S]*?<TaskStatusChip status=\{task\.status\}/);
+  assert.doesNotMatch(projectSource, /task\.status\.replace/);
+});
+
 test("item sheets expose relation browsing and management", () => {
   for (const label of [
     "Relations",

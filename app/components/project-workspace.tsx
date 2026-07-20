@@ -10,6 +10,7 @@ import type {
 } from "@/lib/domain";
 import { formatMoney, summarizeSpending } from "@/lib/domain";
 import { workItemMetadata } from "@/lib/relation-metadata";
+import { TaskStatusChip } from "./task-status-chip";
 import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
 
@@ -209,15 +210,12 @@ export function ProjectWorkspace({
             <div className="collection-item-list">
               {tasks.map((task) => (
                 <button type="button" key={task.id} onClick={() => onOpenItem(task.id)}>
-                  <span className={`task-check ${task.status === "done" ? "complete" : ""}`} aria-hidden="true">{task.status === "done" ? "✓" : ""}</span>
+                  <TaskStatusChip status={task.status} />
                   <span className="row-title">
                     <WorkItemTitle item={task} />
                     <small>
                       {workItemMetadata(
-                        [
-                          task.dueDate ? `Due ${task.dueDate}` : "No due date",
-                          task.status.replace("_", " "),
-                        ],
+                        [task.dueDate ? `Due ${task.dueDate}` : "No due date"],
                         task.id,
                         snapshot.relations,
                         snapshot.items,
