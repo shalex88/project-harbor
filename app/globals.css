@@ -1013,6 +1013,10 @@ strong.work-item-title {
   color: var(--seafoam);
 }
 
+.agenda-event {
+  grid-template-columns: 58px minmax(0, 1fr);
+}
+
 .agenda-item .status-chip {
   grid-row: span 2;
   justify-self: start;
