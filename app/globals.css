@@ -1009,10 +1009,6 @@ strong.work-item-title {
   text-transform: uppercase;
 }
 
-.agenda-event > span {
-  color: var(--seafoam);
-}
-
 .agenda-event {
   grid-template-columns: 58px minmax(0, 1fr);
 }
