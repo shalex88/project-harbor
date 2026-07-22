@@ -4,6 +4,7 @@ import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { chatGPTSignOutPath } from "@/app/chatgpt-auth-paths";
 import type { AppUser, ProjectRecord } from "@/lib/domain";
 import { formatCurrentDate } from "./current-date";
+import { ProjectMenu } from "./project-menu";
 import { Sheet } from "./ui";
 
 export type AppRoute = "overview" | "tasks" | "events" | "timeline" | "spending" | "project";
@@ -46,6 +47,8 @@ export function AppShell({
   children,
   onRouteChange,
   onProjectSelect,
+  onProjectExport,
+  exportingProjectId,
   onPrimaryAction,
 }: {
   user: AppUser;
@@ -57,6 +60,8 @@ export function AppShell({
   children: ReactNode;
   onRouteChange: (route: AppRoute) => void;
   onProjectSelect: (projectId: string) => void;
+  onProjectExport: (projectId: string) => Promise<void>;
+  exportingProjectId: string | null;
   onPrimaryAction: () => void;
 }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -109,16 +114,22 @@ export function AppShell({
         <div className="project-nav">
           <p className="nav-heading">Projects</p>
           {projects.map((project) => (
-            <button
-              type="button"
-              key={project.id}
-              className={`nav-item project-nav-item ${route === "project" && activeProjectId === project.id ? "active-project" : ""}`}
-              onClick={() => onProjectSelect(project.id)}
-            >
-              <span className="project-dot" aria-hidden="true" />
-              <span>{project.name}</span>
-              <small>{project.currency}</small>
-            </button>
+            <div className="project-nav-row" key={project.id}>
+              <button
+                type="button"
+                className={`nav-item project-nav-item ${route === "project" && activeProjectId === project.id ? "active-project" : ""}`}
+                onClick={() => onProjectSelect(project.id)}
+              >
+                <span className="project-dot" aria-hidden="true" />
+                <span>{project.name}</span>
+                <small>{project.currency}</small>
+              </button>
+              <ProjectMenu
+                project={project}
+                busy={exportingProjectId === project.id}
+                onExport={onProjectExport}
+              />
+            </div>
           ))}
         </div>
         <div className="sidebar-user">
@@ -175,11 +186,18 @@ export function AppShell({
           <button type="button" onClick={() => navigate("spending")}>$ <span>Spending</span></button>
           <p className="nav-heading">Projects</p>
           {projects.map((project) => (
-            <button key={project.id} type="button" onClick={() => { setMobileMoreOpen(false); onProjectSelect(project.id); }}>
-              <span className="project-dot" aria-hidden="true" />
-              <span>{project.name}</span>
-              <small>{project.currency}</small>
-            </button>
+            <div className="mobile-project-row" key={project.id}>
+              <button type="button" onClick={() => { setMobileMoreOpen(false); onProjectSelect(project.id); }}>
+                <span className="project-dot" aria-hidden="true" />
+                <span>{project.name}</span>
+                <small>{project.currency}</small>
+              </button>
+              <ProjectMenu
+                project={project}
+                busy={exportingProjectId === project.id}
+                onExport={onProjectExport}
+              />
+            </div>
           ))}
           <a href={chatGPTSignOutPath("/")}>↗ <span>Sign out</span></a>
         </div>

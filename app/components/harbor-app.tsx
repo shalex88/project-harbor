@@ -66,6 +66,7 @@ export function HarborApp({
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [createLocation, setCreateLocation] = useState<CreateLocation>(null);
   const [pending, setPending] = useState(false);
+  const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
@@ -333,6 +334,45 @@ export function HarborApp({
     );
   };
 
+  const exportProject = async (projectId: string) => {
+    setExportingProjectId(projectId);
+    try {
+      const response = await fetch(
+        `/api/projects/${encodeURIComponent(projectId)}/archive`,
+      );
+      if (!response.ok) {
+        const data = await response.json().catch(() => null) as
+          | { error?: string }
+          | null;
+        throw new Error(data?.error || "Unable to export project");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const project = snapshot.projects.find((entry) => entry.id === projectId);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = archiveDownloadFilename(
+          response.headers.get("Content-Disposition"),
+          project?.name ?? "project",
+        );
+        document.body.append(link);
+        link.click();
+        link.remove();
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      pushToast("Project exported");
+    } catch (error) {
+      pushToast(
+        error instanceof Error ? error.message : "Unable to export project",
+        "error",
+      );
+    } finally {
+      setExportingProjectId(null);
+    }
+  };
+
   const openCreate = (type: "task" | "event") => {
     const projectId = activeProjectId ?? snapshot.projects[0]?.id ?? "";
     const collectionId =
@@ -465,6 +505,8 @@ export function HarborApp({
         actionLabel={actionLabel}
         onRouteChange={navigate}
         onProjectSelect={selectProject}
+        onProjectExport={exportProject}
+        exportingProjectId={exportingProjectId}
         onPrimaryAction={primaryAction}
       >
         {content}
@@ -620,6 +662,28 @@ function routePath(route: AppRoute): string {
   if (route === "overview") return "/";
   if (route === "project") return "/";
   return `/${route}`;
+}
+
+function archiveDownloadFilename(
+  contentDisposition: string | null,
+  projectName: string,
+): string {
+  const encoded = contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded.replace(/^"|"$/g, ""));
+    } catch {
+      // Fall through to the plain filename and then the local fallback.
+    }
+  }
+  const plain = contentDisposition?.match(/filename="?([^";]+)"?/i)?.[1];
+  if (plain) return plain;
+  const safeName = projectName
+    .normalize("NFKC")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, "-")
+    .trim()
+    .slice(0, 80) || "project";
+  return `${safeName}.harbor.zip`;
 }
 
 function appLocation(pathname: string): {
