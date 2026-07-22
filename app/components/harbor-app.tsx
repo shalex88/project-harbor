@@ -22,6 +22,7 @@ import {
   TimelineDashboard,
 } from "./dashboards";
 import { ItemSheet, type ItemSheetMode } from "./item-sheet";
+import { shouldLeaveDeletedProjectRoute } from "./project-delete-navigation";
 import { ProjectWorkspace } from "./project-workspace";
 import {
   Field,
@@ -343,6 +344,36 @@ export function HarborApp({
     );
   };
 
+  const renameProject = async (projectId: string, name: string) => {
+    const project = snapshot.projects.find((entry) => entry.id === projectId);
+    if (!project) {
+      const error = new Error("Project unavailable");
+      pushToast(error.message, "error");
+      throw error;
+    }
+    await mutate({
+      action: "update_project",
+      projectId,
+      name,
+      description: project.description,
+    });
+  };
+
+  const deleteProject = async (projectId: string) => {
+    const leaveProjectRoute = shouldLeaveDeletedProjectRoute(
+      route,
+      activeProjectId,
+      projectId,
+    );
+    await mutate({ action: "delete_project", projectId });
+    if (leaveProjectRoute) {
+      setRoute("overview");
+      setActiveProjectId(null);
+      setActiveCollectionId(null);
+      window.history.replaceState({}, "", "/");
+    }
+  };
+
   const exportProject = async (projectId: string) => {
     setExportingProjectId(projectId);
     try {
@@ -559,8 +590,11 @@ export function HarborApp({
         actionLabel={actionLabel}
         onRouteChange={navigate}
         onProjectSelect={selectProject}
+        onProjectRename={renameProject}
         onProjectExport={exportProject}
+        onProjectDelete={deleteProject}
         exportingProjectId={exportingProjectId}
+        projectMutationPending={pending}
         onPrimaryAction={primaryAction}
       >
         {content}

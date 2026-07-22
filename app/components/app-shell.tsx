@@ -1,13 +1,24 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { chatGPTSignOutPath } from "@/app/chatgpt-auth-paths";
 import type { AppUser, ProjectRecord } from "@/lib/domain";
 import { formatCurrentDate } from "./current-date";
 import { ProjectMenu } from "./project-menu";
-import { Sheet } from "./ui";
+import { Field, FormActions, Modal, Sheet, SubmitForm } from "./ui";
 
 export type AppRoute = "overview" | "tasks" | "events" | "timeline" | "spending" | "project";
+
+type ProjectActionDialog =
+  | { kind: "rename"; project: ProjectRecord }
+  | { kind: "delete"; project: ProjectRecord }
+  | null;
 
 const NAV_ITEMS: Array<{ route: AppRoute; label: string; mark: string }> = [
   { route: "overview", label: "Overview", mark: "⌂" },
@@ -47,8 +58,11 @@ export function AppShell({
   children,
   onRouteChange,
   onProjectSelect,
+  onProjectRename,
   onProjectExport,
+  onProjectDelete,
   exportingProjectId,
+  projectMutationPending,
   onPrimaryAction,
 }: {
   user: AppUser;
@@ -60,11 +74,16 @@ export function AppShell({
   children: ReactNode;
   onRouteChange: (route: AppRoute) => void;
   onProjectSelect: (projectId: string) => void;
+  onProjectRename: (projectId: string, name: string) => Promise<void>;
   onProjectExport: (projectId: string) => Promise<void>;
+  onProjectDelete: (projectId: string) => Promise<void>;
   exportingProjectId: string | null;
+  projectMutationPending: boolean;
   onPrimaryAction: () => void;
 }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+  const [projectAction, setProjectAction] =
+    useState<ProjectActionDialog>(null);
   const currentDate = useSyncExternalStore(
     subscribeToCurrentDate,
     getCurrentDateSnapshot,
@@ -84,6 +103,39 @@ export function AppShell({
   const navigate = (next: AppRoute) => {
     setMobileMoreOpen(false);
     onRouteChange(next);
+  };
+
+  const openProjectAction = (
+    kind: Exclude<ProjectActionDialog, null>["kind"],
+    project: ProjectRecord,
+  ) => {
+    setMobileMoreOpen(false);
+    setProjectAction({ kind, project });
+  };
+
+  const submitProjectRename = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (projectAction?.kind !== "rename") return;
+    const data = new FormData(event.currentTarget);
+    try {
+      await onProjectRename(
+        projectAction.project.id,
+        String(data.get("name") ?? ""),
+      );
+      setProjectAction(null);
+    } catch {
+      // HarborApp reports mutation failures in the shared toast region.
+    }
+  };
+
+  const deleteProject = async () => {
+    if (projectAction?.kind !== "delete") return;
+    try {
+      await onProjectDelete(projectAction.project.id);
+      setProjectAction(null);
+    } catch {
+      // HarborApp reports mutation failures in the shared toast region.
+    }
   };
 
   return (
@@ -125,8 +177,16 @@ export function AppShell({
               </button>
               <ProjectMenu
                 project={project}
-                busy={exportingProjectId === project.id}
+                busy={
+                  exportingProjectId === project.id || projectMutationPending
+                }
+                onRename={(selectedProject) =>
+                  openProjectAction("rename", selectedProject)
+                }
                 onExport={onProjectExport}
+                onDelete={(selectedProject) =>
+                  openProjectAction("delete", selectedProject)
+                }
               />
             </div>
           ))}
@@ -192,14 +252,87 @@ export function AppShell({
               </button>
               <ProjectMenu
                 project={project}
-                busy={exportingProjectId === project.id}
+                busy={
+                  exportingProjectId === project.id || projectMutationPending
+                }
+                onRename={(selectedProject) =>
+                  openProjectAction("rename", selectedProject)
+                }
                 onExport={onProjectExport}
+                onDelete={(selectedProject) =>
+                  openProjectAction("delete", selectedProject)
+                }
               />
             </div>
           ))}
           <a href={chatGPTSignOutPath("/")}>↗ <span>Sign out</span></a>
         </div>
       </Sheet>
+
+      <Modal
+        open={projectAction?.kind === "rename"}
+        title="Rename project"
+        description="Choose a new name for this project."
+        onClose={() => {
+          if (!projectMutationPending) setProjectAction(null);
+        }}
+        size="small"
+      >
+        {projectAction?.kind === "rename" ? (
+          <SubmitForm onSubmit={submitProjectRename}>
+            <Field label="Project name">
+              <input
+                name="name"
+                defaultValue={projectAction.project.name}
+                required
+                maxLength={120}
+              />
+            </Field>
+            <FormActions
+              submitLabel="Rename project"
+              pending={projectMutationPending}
+              onCancel={() => setProjectAction(null)}
+            />
+          </SubmitForm>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={projectAction?.kind === "delete"}
+        title="Delete project"
+        description="This permanently removes the project and everything in it."
+        onClose={() => {
+          if (!projectMutationPending) setProjectAction(null);
+        }}
+        size="small"
+      >
+        {projectAction?.kind === "delete" ? (
+          <>
+            <p className="confirmation-copy">
+              Delete <strong>{projectAction.project.name}</strong>? This cannot
+              be undone.
+            </p>
+            <div className="form-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={projectMutationPending}
+                onClick={() => setProjectAction(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                disabled={projectMutationPending}
+                onClick={() => void deleteProject()}
+              >
+                {projectMutationPending ? "Deleting…" : "Delete project"}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </Modal>
     </div>
   );
 }
