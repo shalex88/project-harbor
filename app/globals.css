@@ -217,7 +217,7 @@ a {
   min-width: 174px;
   border: 1px solid var(--border-bright);
   border-radius: 8px;
-  background: var(--panel-strong);
+  background: var(--card);
   box-shadow: var(--shadow);
   padding: 5px;
 }

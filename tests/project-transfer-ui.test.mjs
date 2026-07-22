@@ -60,6 +60,13 @@ test("project menu styles preserve navigation and touch target behavior", () => 
   assert.match(styles, /min-(?:width|height):\s*44px/);
 });
 
+test("project export menu uses an opaque surface", () => {
+  const menuRule =
+    styles.match(/\.project-context-menu\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+  assert.match(menuRule, /background:\s*var\(--card\)/);
+  assert.doesNotMatch(menuRule, /var\(--panel-strong\)/);
+});
+
 test("new project dialog imports Harbor archives as independent projects", () => {
   assert.match(harbor, /Import project/);
   assert.match(harbor, /Choose project archive/);
