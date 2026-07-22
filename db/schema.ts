@@ -127,6 +127,7 @@ export const workItems = sqliteTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id),
+    importedCreatorLabel: text("imported_creator_label"),
     ...timestamps,
   },
   (table) => [
@@ -234,6 +235,7 @@ export const fileObjects = sqliteTable(
     uploadedBy: text("uploaded_by")
       .notNull()
       .references(() => users.id),
+    importedUploaderLabel: text("imported_uploader_label"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
@@ -275,6 +277,7 @@ export const payments = sqliteTable(
     createdBy: text("created_by")
       .notNull()
       .references(() => users.id),
+    importedCreatorLabel: text("imported_creator_label"),
     ...timestamps,
   },
   (table) => [

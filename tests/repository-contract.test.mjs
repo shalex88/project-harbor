@@ -88,3 +88,20 @@ test("preview persistence and seed data use only todo and done task states", () 
   assert.doesNotMatch(repository, /^\s+"in_progress",$/m);
   assert.doesNotMatch(repository, /"todo" \| "in_progress" \| "done"/);
 });
+
+test("workspace snapshots prefer imported display labels without changing actor ids", () => {
+  assert.match(
+    repository,
+    /CASE WHEN wi\.imported_creator_label IS NOT NULL THEN wi\.imported_creator_label \|\| ' \(imported\)' ELSE creator\.display_name END AS created_by_name/,
+  );
+  assert.match(
+    repository,
+    /CASE WHEN p\.imported_creator_label IS NOT NULL THEN p\.imported_creator_label \|\| ' \(imported\)' ELSE u\.display_name END AS display_name/,
+  );
+  assert.match(
+    repository,
+    /CASE WHEN fo\.imported_uploader_label IS NOT NULL THEN fo\.imported_uploader_label \|\| ' \(imported\)' ELSE uploader\.display_name END AS uploaded_by_name/,
+  );
+  assert.match(repository, /createdBy: row\.created_by/);
+  assert.match(repository, /uploadedBy: row\.uploaded_by/);
+});

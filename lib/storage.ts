@@ -18,8 +18,39 @@ export async function putObject(
   });
 }
 
+export async function putObjectBytes(
+  key: string,
+  bytes: Uint8Array,
+  contentType: string,
+): Promise<void> {
+  await bucket().put(key, bytes, {
+    httpMetadata: { contentType },
+  });
+}
+
 export async function getObject(key: string): Promise<R2ObjectBody | null> {
   return bucket().get(key);
+}
+
+export async function readObjectBytes(key: string): Promise<Uint8Array | null> {
+  const object = await getObject(key);
+  if (!object) return null;
+  const reader = object.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    size += value.byteLength;
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 export async function deleteObject(key: string): Promise<void> {

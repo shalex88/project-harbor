@@ -69,3 +69,9 @@ test("local setup applies every checked-in D1 migration", () => {
   assert.match(packageJson.scripts["dev:setup"], /d1 migrations apply/);
   assert.equal(localD1Config.d1_databases[0].migrations_dir, "../drizzle");
 });
+
+test("imported project attribution is stored without changing actor ownership", () => {
+  assert.match(migration, /`work_items`[\s\S]*?`imported_creator_label` text/);
+  assert.match(migration, /`payments`[\s\S]*?`imported_creator_label` text/);
+  assert.match(migration, /`file_objects`[\s\S]*?`imported_uploader_label` text/);
+});
