@@ -122,7 +122,6 @@ export function AppShell({
               >
                 <span className="project-dot" aria-hidden="true" />
                 <span>{project.name}</span>
-                <small>{project.currency}</small>
               </button>
               <ProjectMenu
                 project={project}
@@ -190,7 +189,6 @@ export function AppShell({
               <button type="button" onClick={() => { setMobileMoreOpen(false); onProjectSelect(project.id); }}>
                 <span className="project-dot" aria-hidden="true" />
                 <span>{project.name}</span>
-                <small>{project.currency}</small>
               </button>
               <ProjectMenu
                 project={project}

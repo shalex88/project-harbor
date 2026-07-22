@@ -280,11 +280,6 @@ a {
   color: var(--text);
 }
 
-.project-nav-item small {
-  color: var(--text-muted);
-  font-size: 10px;
-}
-
 .project-dot {
   width: 10px;
   height: 10px;

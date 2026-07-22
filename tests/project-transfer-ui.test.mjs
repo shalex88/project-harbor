@@ -28,6 +28,18 @@ test("desktop and mobile project rows expose separate export menus", () => {
   assert.match(menu, /aria-label={`More actions for \$\{project\.name\}`}/);
 });
 
+test("project navigation omits currency labels on desktop and mobile", () => {
+  const currencyLabels =
+    shell.match(/<small>\{project\.currency\}<\/small>/g) ?? [];
+
+  assert.equal(
+    currencyLabels.length,
+    0,
+    "desktop and mobile project navigation must omit currency labels",
+  );
+  assert.doesNotMatch(styles, /\.project-nav-item small\s*\{/);
+});
+
 test("project menus expose accessible semantics and keyboard behavior", () => {
   assert.match(menu, /aria-haspopup="menu"/);
   assert.match(menu, /aria-expanded=\{open\}/);
