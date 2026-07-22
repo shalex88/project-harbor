@@ -275,6 +275,44 @@ test("export loads every stored payload and produces a valid Harbor archive", as
   const decoded = await decodeProjectArchive(result.bytes);
   assert.deepEqual(decoded.payloads, fixture.payloads);
   assert.equal(decoded.manifest.exportedAt, "2026-07-22T12:00:00.000Z");
+  assert.deepEqual(decoded.manifest.payments, fixture.manifest.payments);
+  assert.deepEqual(decoded.manifest.attachments, fixture.manifest.attachments);
+  assert.deepEqual(decoded.manifest.receipts, fixture.manifest.receipts);
+  assert.equal(decoded.manifest.attachments[0].pinned, false);
+});
+
+test("export reflects the source's current empty payment and file state", async () => {
+  const fixture = await importFixture();
+  const source = {
+    project: fixture.manifest.project,
+    collections: fixture.manifest.collections,
+    items: fixture.manifest.items,
+    relations: fixture.manifest.relations,
+    payments: [],
+    attachments: [],
+    receipts: [],
+  };
+  const { dependencies } = serviceDependencies({
+    loadSource: async () => source,
+    readObjectBytes: async () => {
+      throw new Error("an empty source must not read stored objects");
+    },
+  });
+  const result = await createProjectTransferService(
+    dependencies,
+  ).exportProjectArchive(
+    { email: "alex@example.com", displayName: "Alex" },
+    "project-1",
+  );
+
+  const { decodeProjectArchive } = await import(
+    "../lib/project-archive-zip.ts"
+  );
+  const decoded = await decodeProjectArchive(result.bytes);
+  assert.deepEqual(decoded.manifest.payments, []);
+  assert.deepEqual(decoded.manifest.attachments, []);
+  assert.deepEqual(decoded.manifest.receipts, []);
+  assert.deepEqual(decoded.payloads, new Map());
 });
 
 test("bounded request reading rejects actual bytes beyond the limit", async () => {
