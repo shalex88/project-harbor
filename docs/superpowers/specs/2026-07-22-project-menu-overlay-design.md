@@ -43,7 +43,8 @@ defect comes from the popup’s containing block and overflow boundary.
 Create `app/components/project-menu-position.ts` with a pure
 `calculateProjectMenuPosition` function. It accepts the trigger rectangle,
 measured menu size, viewport size, and optional gap/margin values. It returns
-fixed-position `top` and `left` coordinates.
+fixed-position `top` and `left` coordinates. The defaults are the approved 6px
+trigger gap and 8px viewport margin.
 
 The helper right-aligns the menu to the trigger, clamps the horizontal result
 inside the viewport, prefers placement below, flips above when the below
@@ -75,9 +76,9 @@ continues to reference the portaled menu by its stable ID.
 
 `.project-context-menu` changes from `position: absolute` to
 `position: fixed`. Inline `top` and `left` coordinates own placement, so the
-old `top` and `right` anchor declarations are removed. The menu receives a
-stacking level above the existing overlay layer so it remains visible when
-opened from the mobile More sheet.
+old `top` and `right` anchor declarations are removed. The menu uses
+`z-index: 120`, above the existing overlay layer’s `z-index: 100`, so it remains
+visible when opened from the mobile More sheet.
 
 The portal does not change `.project-nav` overflow behavior; long project lists
 remain independently scrollable and the sidebar user block stays anchored at
