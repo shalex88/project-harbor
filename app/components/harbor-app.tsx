@@ -368,6 +368,8 @@ export function HarborApp({
     await mutate({ action: "delete_project", projectId });
     if (leaveProjectRoute) {
       setRoute("overview");
+      setActiveProjectId(null);
+      setActiveCollectionId(null);
       window.history.replaceState({}, "", "/");
     }
   };
