@@ -73,6 +73,7 @@ test("new project dialog imports Harbor archives as independent projects", () =>
   assert.match(harbor, /setActiveProjectId\(data\.projectId\)/);
   assert.match(harbor, /Project imported/);
   assert.match(harbor, /Importing…/);
+  assert.match(harbor, /type="file"\s+hidden/);
   assert.match(styles, /\.project-import-section/);
 });
 

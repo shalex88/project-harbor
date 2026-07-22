@@ -3,7 +3,6 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  MAX_ARCHIVE_BYTES,
   parseProjectArchiveManifest,
   sha256Hex,
 } from "../lib/project-archive.ts";
@@ -245,14 +244,14 @@ test("export loads every stored payload and produces a valid Harbor archive", as
     items: fixture.manifest.items,
     relations: fixture.manifest.relations,
     payments: fixture.manifest.payments,
-    attachments: fixture.manifest.attachments.map(({ sha256: _sha256, ...entry }) => ({
-      ...entry,
-      r2Key: "source/file-1",
-    })),
-    receipts: fixture.manifest.receipts.map(({ sha256: _sha256, ...entry }) => ({
-      ...entry,
-      r2Key: "source/file-2",
-    })),
+    attachments: fixture.manifest.attachments.map(({ sha256, ...entry }) => {
+      void sha256;
+      return { ...entry, r2Key: "source/file-1" };
+    }),
+    receipts: fixture.manifest.receipts.map(({ sha256, ...entry }) => {
+      void sha256;
+      return { ...entry, r2Key: "source/file-2" };
+    }),
   };
   const { dependencies } = serviceDependencies({
     loadSource: async () => source,

@@ -646,8 +646,8 @@ export function HarborApp({
           </button>
           <input
             ref={importInputRef}
-            className="sr-only"
             type="file"
+            hidden
             accept=".harbor.zip,.zip,application/zip"
             disabled={pending || importing}
             onChange={importProject}

@@ -64,6 +64,7 @@ export function createProjectTransferService(
         }
         payloads.set(entry.path, bytes);
         const { r2Key: _r2Key, ...manifestEntry } = entry;
+        void _r2Key;
         attachments.push({
           ...manifestEntry,
           sha256: await sha256Hex(bytes),
@@ -77,6 +78,7 @@ export function createProjectTransferService(
         }
         payloads.set(entry.path, bytes);
         const { r2Key: _r2Key, ...manifestEntry } = entry;
+        void _r2Key;
         receipts.push({
           ...manifestEntry,
           sha256: await sha256Hex(bytes),
