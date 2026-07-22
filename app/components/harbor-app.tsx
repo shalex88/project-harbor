@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import type {
   WorkspaceMutation,
   WorkspaceMutationResult,
@@ -66,9 +73,11 @@ export function HarborApp({
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [createLocation, setCreateLocation] = useState<CreateLocation>(null);
   const [pending, setPending] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   const activeProject =
     snapshot.projects.find((project) => project.id === activeProjectId) ?? null;
@@ -494,6 +503,51 @@ export function HarborApp({
     setNewProjectOpen(false);
   };
 
+  const importProject = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    if (!file || pending || importing) return;
+    setImporting(true);
+    try {
+      const response = await fetch("/api/projects/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/zip" },
+        body: file,
+      });
+      const data = await response.json().catch(() => null) as
+        | { snapshot?: WorkspaceSnapshot; projectId?: string; error?: string }
+        | null;
+      if (!response.ok) {
+        throw new Error(data?.error || "Unable to import project");
+      }
+      if (!data?.snapshot || typeof data.projectId !== "string") {
+        throw new Error("Unable to import project");
+      }
+      acceptSnapshot(data.snapshot);
+      setActiveProjectId(data.projectId);
+      setActiveCollectionId(
+        data.snapshot.collections.find(
+          (collection) => collection.projectId === data.projectId,
+        )?.id ?? null,
+      );
+      setRoute("project");
+      window.history.pushState(
+        {},
+        "",
+        `/projects/${encodeURIComponent(data.projectId)}`,
+      );
+      setNewProjectOpen(false);
+      pushToast("Project imported");
+    } catch (error) {
+      pushToast(
+        error instanceof Error ? error.message : "Unable to import project",
+        "error",
+      );
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = "";
+      setImporting(false);
+    }
+  };
+
   return (
     <>
       <AppShell
@@ -532,7 +586,9 @@ export function HarborApp({
         open={newProjectOpen}
         title="New project"
         description="Create a shared workspace with one fixed currency."
-        onClose={() => setNewProjectOpen(false)}
+        onClose={() => {
+          if (!importing) setNewProjectOpen(false);
+        }}
       >
         <SubmitForm onSubmit={submitProject}>
           <Field label="Project name">
@@ -541,6 +597,7 @@ export function HarborApp({
               required
               maxLength={120}
               placeholder="Mobile Launch"
+              disabled={importing}
             />
           </Field>
           <Field label="Description" hint="Optional">
@@ -548,13 +605,14 @@ export function HarborApp({
               name="description"
               maxLength={1000}
               placeholder="What is this project coordinating?"
+              disabled={importing}
             />
           </Field>
           <Field
             label="Project currency"
             hint="All estimates and payments in this project use this currency."
           >
-            <select name="currency" defaultValue="USD">
+            <select name="currency" defaultValue="USD" disabled={importing}>
               <option value="USD">USD — US Dollar</option>
               <option value="EUR">EUR — Euro</option>
               <option value="GBP">GBP — British Pound</option>
@@ -566,10 +624,35 @@ export function HarborApp({
           </Field>
           <FormActions
             submitLabel="Create project"
-            pending={pending}
+            pending={pending || importing}
             onCancel={() => setNewProjectOpen(false)}
           />
         </SubmitForm>
+        <section
+          className="project-import-section"
+          aria-labelledby="project-import-title"
+        >
+          <div>
+            <h3 id="project-import-title">Import project</h3>
+            <p>A Harbor archive creates a new project owned by you.</p>
+          </div>
+          <button
+            className="button button-secondary archive-picker"
+            type="button"
+            disabled={pending || importing}
+            onClick={() => importInputRef.current?.click()}
+          >
+            {importing ? "Importing…" : "Choose project archive"}
+          </button>
+          <input
+            ref={importInputRef}
+            className="sr-only"
+            type="file"
+            accept=".harbor.zip,.zip,application/zip"
+            disabled={pending || importing}
+            onChange={importProject}
+          />
+        </section>
       </Modal>
 
       <Modal

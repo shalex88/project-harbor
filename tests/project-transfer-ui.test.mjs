@@ -59,3 +59,28 @@ test("project menu styles preserve navigation and touch target behavior", () => 
   assert.match(styles, /\.mobile-project-row/);
   assert.match(styles, /min-(?:width|height):\s*44px/);
 });
+
+test("new project dialog imports Harbor archives as independent projects", () => {
+  assert.match(harbor, /Import project/);
+  assert.match(harbor, /Choose project archive/);
+  assert.match(
+    harbor,
+    /accept="\.harbor\.zip,\.zip,application\/zip"/,
+  );
+  assert.match(harbor, /fetch\("\/api\/projects\/import"/);
+  assert.match(harbor, /headers: \{ "Content-Type": "application\/zip" \}/);
+  assert.match(harbor, /acceptSnapshot\(data\.snapshot\)/);
+  assert.match(harbor, /setActiveProjectId\(data\.projectId\)/);
+  assert.match(harbor, /Project imported/);
+  assert.match(harbor, /Importing…/);
+  assert.match(styles, /\.project-import-section/);
+});
+
+test("import flow retains retry access and suppresses duplicate submissions", () => {
+  assert.match(harbor, /setImporting\(true\)/);
+  assert.match(harbor, /setImporting\(false\)/);
+  assert.match(harbor, /importInputRef\.current\.value = ""/);
+  assert.match(harbor, /disabled=\{pending \|\| importing\}/);
+  assert.match(harbor, /onClose=\{\(\) => \{[\s\S]*?if \(!importing\)/);
+  assert.match(harbor, /Unable to import project/);
+});

@@ -611,6 +611,32 @@ a {
   margin-top: 4px;
 }
 
+.project-import-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: 22px;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.project-import-section h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.project-import-section p {
+  margin: 5px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.archive-picker {
+  flex: 0 0 auto;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2586,6 +2612,15 @@ strong.work-item-title {
   .form-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .project-import-section {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .archive-picker {
+    width: 100%;
   }
 
   .toast-region {

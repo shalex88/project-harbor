@@ -48,10 +48,6 @@ export function ProjectMenu({
     };
   }, [open]);
 
-  useEffect(() => {
-    if (busy) setOpen(false);
-  }, [busy]);
-
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
