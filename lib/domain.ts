@@ -69,6 +69,7 @@ export type ItemFileRecord = {
   sizeBytes: number;
   pinned: boolean;
   uploadedBy: string;
+  uploadedByName: string;
   createdAt: string;
 };
 
@@ -97,6 +98,7 @@ type WorkItemBase = {
   actualSpendMinor: number;
   varianceMinor: number | null;
   createdBy: string;
+  createdByName: string;
   createdAt: string;
   updatedAt: string;
   files: ItemFileRecord[];

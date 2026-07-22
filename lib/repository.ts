@@ -43,12 +43,12 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','member')), joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(project_id,user_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_invitations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, accepted_at TEXT, UNIQUE(project_id,email), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(invited_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'cyan', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
-  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, imported_creator_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
   `CREATE TABLE IF NOT EXISTS work_item_relations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('follows_from','blocks','related_to')), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_item_id <> target_item_id), CHECK(type <> 'related_to' OR source_item_id < target_item_id), UNIQUE(project_id,type,source_item_id,target_item_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(source_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(target_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
-  `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, imported_uploader_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS item_files (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_object_id TEXT NOT NULL UNIQUE, pinned INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
-  `CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), paid_on TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), paid_on TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL, imported_creator_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS payment_receipts (payment_id TEXT PRIMARY KEY NOT NULL, file_object_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(payment_id) REFERENCES payments(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_id)`,
   `CREATE INDEX IF NOT EXISTS project_invitations_email_idx ON project_invitations(email,status)`,
@@ -603,10 +603,12 @@ export async function loadWorkspaceSnapshot(
     occurrence_date: string | null;
     estimated_cost_minor: number | null;
     created_by: string;
+    created_by_name: string;
     created_at: string;
     updated_at: string;
   }>(
-    `SELECT wi.* FROM work_items wi
+    `SELECT wi.*,CASE WHEN wi.imported_creator_label IS NOT NULL THEN wi.imported_creator_label || ' (imported)' ELSE creator.display_name END AS created_by_name FROM work_items wi
+     JOIN users creator ON creator.id = wi.created_by
      JOIN project_members current ON current.project_id = wi.project_id
      WHERE current.user_id = ? ORDER BY COALESCE(wi.due_date,wi.occurrence_date,'9999-12-31'),wi.created_at DESC`,
     user.id,
@@ -621,10 +623,12 @@ export async function loadWorkspaceSnapshot(
     size_bytes: number;
     pinned: number;
     uploaded_by: string;
+    uploaded_by_name: string;
     created_at: string;
   }>(
-    `SELECT inf.id,inf.item_id,inf.file_object_id,fo.filename,fo.content_type,fo.size_bytes,inf.pinned,fo.uploaded_by,fo.created_at
+    `SELECT inf.id,inf.item_id,inf.file_object_id,fo.filename,fo.content_type,fo.size_bytes,inf.pinned,fo.uploaded_by,CASE WHEN fo.imported_uploader_label IS NOT NULL THEN fo.imported_uploader_label || ' (imported)' ELSE uploader.display_name END AS uploaded_by_name,fo.created_at
      FROM item_files inf JOIN file_objects fo ON fo.id = inf.file_object_id
+     JOIN users uploader ON uploader.id = fo.uploaded_by
      JOIN work_items wi ON wi.id = inf.item_id
      JOIN project_members current ON current.project_id = wi.project_id
      WHERE current.user_id = ? ORDER BY inf.pinned DESC,inf.position,fo.created_at DESC`,
@@ -644,7 +648,7 @@ export async function loadWorkspaceSnapshot(
     created_at: string;
     updated_at: string;
   }>(
-    `SELECT p.id,p.item_id,p.amount_minor,p.paid_on,p.note,p.created_by,u.display_name,
+    `SELECT p.id,p.item_id,p.amount_minor,p.paid_on,p.note,p.created_by,CASE WHEN p.imported_creator_label IS NOT NULL THEN p.imported_creator_label || ' (imported)' ELSE u.display_name END AS display_name,
             pr.file_object_id AS receipt_file_id,fo.filename AS receipt_filename,p.created_at,p.updated_at
      FROM payments p JOIN work_items wi ON wi.id = p.item_id
      JOIN project_members current ON current.project_id = wi.project_id
@@ -683,6 +687,7 @@ export async function loadWorkspaceSnapshot(
       sizeBytes: row.size_bytes,
       pinned: Boolean(row.pinned),
       uploadedBy: row.uploaded_by,
+      uploadedByName: row.uploaded_by_name,
       createdAt: row.created_at,
     };
     fileMap.set(row.item_id, [...(fileMap.get(row.item_id) ?? []), value]);
@@ -722,6 +727,7 @@ export async function loadWorkspaceSnapshot(
       actualSpendMinor: money.actualMinor,
       varianceMinor: money.varianceMinor,
       createdBy: row.created_by,
+      createdByName: row.created_by_name,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       files: fileMap.get(row.id) ?? [],
