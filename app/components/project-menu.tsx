@@ -23,11 +23,15 @@ function announceProjectMenuOpen(menuId: string) {
 export function ProjectMenu({
   project,
   busy,
+  onRename,
   onExport,
+  onDelete,
 }: {
   project: ProjectRecord;
   busy: boolean;
+  onRename: (project: ProjectRecord) => void;
   onExport: (projectId: string) => Promise<void>;
+  onDelete: (project: ProjectRecord) => void;
 }) {
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -139,6 +143,20 @@ export function ProjectMenu({
       aria-label={`Actions for ${project.name}`}
       onKeyDown={handleMenuKeyDown}
     >
+      {project.role === "owner" ? (
+        <button
+          type="button"
+          role="menuitem"
+          disabled={busy}
+          onClick={() => {
+            close();
+            onRename(project);
+          }}
+        >
+          <span aria-hidden="true">✎</span>
+          Rename project
+        </button>
+      ) : null}
       <button
         type="button"
         role="menuitem"
@@ -151,6 +169,21 @@ export function ProjectMenu({
         <span aria-hidden="true">⇩</span>
         Export project
       </button>
+      {project.role === "owner" ? (
+        <button
+          className="project-menu-danger"
+          type="button"
+          role="menuitem"
+          disabled={busy}
+          onClick={() => {
+            close();
+            onDelete(project);
+          }}
+        >
+          <span aria-hidden="true">×</span>
+          Delete project
+        </button>
+      ) : null}
     </div>
   ) : null;
 

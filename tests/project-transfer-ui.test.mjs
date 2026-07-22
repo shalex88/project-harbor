@@ -55,6 +55,39 @@ test("project menus expose accessible semantics and keyboard behavior", () => {
   assert.match(menu, /triggerRef\.current\?\.focus\(\)/);
 });
 
+test("owner project menus expose rename and delete actions", () => {
+  assert.match(menu, /project\.role === "owner"/);
+  assert.match(menu, /Rename project/);
+  assert.match(menu, /Delete project/);
+  assert.match(menu, /onRename\(project\)/);
+  assert.match(menu, /onDelete\(project\)/);
+  assert.match(menu, /className="project-menu-danger"/);
+});
+
+test("the shell coordinates shared project rename and delete dialogs", () => {
+  assert.match(shell, /type ProjectActionDialog/);
+  assert.match(shell, /onProjectRename/);
+  assert.match(shell, /onProjectDelete/);
+  assert.match(shell, /setMobileMoreOpen\(false\)/);
+  assert.match(shell, /title="Rename project"/);
+  assert.match(
+    shell,
+    /name="name"[\s\S]*?required[\s\S]*?maxLength=\{120\}/,
+  );
+  assert.match(shell, /title="Delete project"/);
+  assert.match(shell, /className="button button-danger"/);
+});
+
+test("project menu actions use existing mutations and clean stale routes", () => {
+  assert.match(harbor, /action: "update_project"/);
+  assert.match(harbor, /description: project\.description/);
+  assert.match(harbor, /action: "delete_project"/);
+  assert.match(harbor, /shouldLeaveDeletedProjectRoute/);
+  assert.match(harbor, /window\.history\.replaceState\(\{\}, "", "\/"\)/);
+  assert.match(harbor, /onProjectRename=\{renameProject\}/);
+  assert.match(harbor, /onProjectDelete=\{deleteProject\}/);
+});
+
 test("export fetches the project archive and triggers a browser download", () => {
   assert.match(
     harbor,

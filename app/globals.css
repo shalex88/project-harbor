@@ -245,6 +245,15 @@ a {
   outline: none;
 }
 
+.project-context-menu .project-menu-danger {
+  color: #fecdd3;
+}
+
+.project-context-menu .project-menu-danger:hover,
+.project-context-menu .project-menu-danger:focus-visible {
+  background: rgba(251, 113, 133, 0.12);
+}
+
 .nav-item {
   display: grid;
   min-height: 44px;
