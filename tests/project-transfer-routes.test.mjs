@@ -335,6 +335,8 @@ test("authenticated routes enforce limits and download headers", () => {
   assert.match(exportRoute, /requireAppUser\(\)/);
   assert.match(exportRoute, /downloadHeaders/);
   assert.match(exportRoute, /application\/zip/);
+  assert.match(exportRoute, /return new Response\(bytes, \{/);
+  assert.doesNotMatch(exportRoute, /bytes\.buffer\.slice/);
   assert.match(importRoute, /requireAppUser\(\)/);
   assert.match(importRoute, /Content-Length/i);
   assert.match(importRoute, /MAX_ARCHIVE_BYTES/);
