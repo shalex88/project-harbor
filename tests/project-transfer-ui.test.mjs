@@ -49,6 +49,9 @@ test("project menus expose accessible semantics and keyboard behavior", () => {
   assert.match(menu, /event\.key === "ArrowUp"/);
   assert.match(menu, /event\.key === "Escape"/);
   assert.match(menu, /document\.addEventListener\("pointerdown"/);
+  assert.match(menu, /window\.dispatchEvent\(/);
+  assert.match(menu, /window\.addEventListener\(PROJECT_MENU_OPEN_EVENT/);
+  assert.match(menu, /window\.removeEventListener\(PROJECT_MENU_OPEN_EVENT/);
   assert.match(menu, /triggerRef\.current\?\.focus\(\)/);
 });
 

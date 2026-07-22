@@ -13,11 +13,7 @@ export async function GET(
     const identity = await requireAppUser();
     const { projectId } = await context.params;
     const { bytes, filename } = await exportProjectArchive(identity, projectId);
-    const body = bytes.buffer.slice(
-      bytes.byteOffset,
-      bytes.byteOffset + bytes.byteLength,
-    ) as ArrayBuffer;
-    return new Response(body, {
+    return new Response(bytes, {
       headers: downloadHeaders({
         filename,
         contentType: "application/zip",

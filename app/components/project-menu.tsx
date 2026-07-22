@@ -12,6 +12,14 @@ import { createPortal } from "react-dom";
 import type { ProjectRecord } from "@/lib/domain";
 import { calculateProjectMenuPosition } from "./project-menu-position";
 
+const PROJECT_MENU_OPEN_EVENT = "project-menu:open";
+
+function announceProjectMenuOpen(menuId: string) {
+  window.dispatchEvent(
+    new CustomEvent(PROJECT_MENU_OPEN_EVENT, { detail: { menuId } }),
+  );
+}
+
 export function ProjectMenu({
   project,
   busy,
@@ -58,6 +66,11 @@ export function ProjectMenu({
     }
   };
 
+  const openMenu = () => {
+    announceProjectMenuOpen(menuId);
+    setOpen(true);
+  };
+
   useEffect(() => {
     if (!open) return;
     const frame = requestAnimationFrame(() =>
@@ -74,12 +87,22 @@ export function ProjectMenu({
         close();
       }
     };
+    const onProjectMenuOpen = (event: Event) => {
+      if (
+        event instanceof CustomEvent &&
+        event.detail?.menuId !== menuId
+      ) {
+        close();
+      }
+    };
     document.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener(PROJECT_MENU_OPEN_EVENT, onProjectMenuOpen);
     return () => {
       cancelAnimationFrame(frame);
       document.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener(PROJECT_MENU_OPEN_EVENT, onProjectMenuOpen);
     };
-  }, [open]);
+  }, [open, menuId]);
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -142,11 +165,17 @@ export function ProjectMenu({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         disabled={busy}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          if (open) {
+            close();
+          } else {
+            openMenu();
+          }
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            setOpen(true);
+            openMenu();
           }
           if (event.key === "Escape" && open) {
             event.preventDefault();
