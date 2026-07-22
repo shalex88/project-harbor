@@ -67,6 +67,24 @@ test("project export menu uses an opaque surface", () => {
   assert.doesNotMatch(menuRule, /var\(--panel-strong\)/);
 });
 
+test("project menu renders as a viewport-fixed portal", () => {
+  assert.match(menu, /import \{ createPortal \} from "react-dom"/);
+  assert.match(menu, /calculateProjectMenuPosition/);
+  assert.match(menu, /createPortal\([\s\S]*document\.body/);
+  assert.match(menu, /window\.addEventListener\("resize", positionMenu\)/);
+  assert.match(menu, /window\.addEventListener\("scroll", positionMenu, true\)/);
+  assert.match(menu, /menuRef\.current\?\.contains\(target\)/);
+
+  const menuRule =
+    styles.match(/\.project-context-menu\s*\{([\s\S]*?)\}/)?.[1] ?? "";
+  assert.match(menuRule, /position:\s*fixed/);
+  assert.match(menuRule, /z-index:\s*120/);
+  assert.match(menuRule, /visibility:\s*hidden/);
+  assert.doesNotMatch(menuRule, /position:\s*absolute/);
+  assert.doesNotMatch(menuRule, /right:\s*0/);
+  assert.doesNotMatch(menuRule, /calc\(100% \+ 5px\)/);
+});
+
 test("new project dialog imports Harbor archives as independent projects", () => {
   assert.match(harbor, /Import project/);
   assert.match(harbor, /Choose project archive/);

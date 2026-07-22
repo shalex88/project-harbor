@@ -209,10 +209,11 @@ a {
 }
 
 .project-context-menu {
-  position: absolute;
-  z-index: 80;
-  top: calc(100% + 5px);
-  right: 0;
+  position: fixed;
+  z-index: 120;
+  top: 0;
+  left: 0;
+  visibility: hidden;
   width: max-content;
   min-width: 174px;
   border: 1px solid var(--border-bright);

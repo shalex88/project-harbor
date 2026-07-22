@@ -3,11 +3,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import type { ProjectRecord } from "@/lib/domain";
+import { calculateProjectMenuPosition } from "./project-menu-position";
 
 export function ProjectMenu({
   project,
@@ -24,6 +27,30 @@ export function ProjectMenu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  useLayoutEffect(() => {
+    if (!open) return;
+    const positionMenu = () => {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      const position = calculateProjectMenuPosition({
+        trigger: trigger.getBoundingClientRect(),
+        menu: menu.getBoundingClientRect(),
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+      });
+      menu.style.top = `${position.top}px`;
+      menu.style.left = `${position.left}px`;
+      menu.style.visibility = "visible";
+    };
+    positionMenu();
+    window.addEventListener("resize", positionMenu);
+    window.addEventListener("scroll", positionMenu, true);
+    return () => {
+      window.removeEventListener("resize", positionMenu);
+      window.removeEventListener("scroll", positionMenu, true);
+    };
+  }, [open]);
+
   const close = (restoreFocus = false) => {
     setOpen(false);
     if (restoreFocus) {
@@ -39,7 +66,13 @@ export function ProjectMenu({
       )?.focus(),
     );
     const onPointerDown = (event: PointerEvent) => {
-      if (!containerRef.current?.contains(event.target as Node)) close();
+      const target = event.target as Node;
+      if (
+        !containerRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        close();
+      }
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => {
@@ -74,6 +107,30 @@ export function ProjectMenu({
     items[nextIndex]?.focus();
   };
 
+  const menuContent = open ? (
+    <div
+      id={menuId}
+      ref={menuRef}
+      className="project-context-menu"
+      role="menu"
+      aria-label={`Actions for ${project.name}`}
+      onKeyDown={handleMenuKeyDown}
+    >
+      <button
+        type="button"
+        role="menuitem"
+        disabled={busy}
+        onClick={() => {
+          close();
+          void onExport(project.id);
+        }}
+      >
+        <span aria-hidden="true">⇩</span>
+        Export project
+      </button>
+    </div>
+  ) : null;
+
   return (
     <div className="project-menu" ref={containerRef}>
       <button
@@ -99,29 +156,7 @@ export function ProjectMenu({
       >
         <span aria-hidden="true">•••</span>
       </button>
-      {open ? (
-        <div
-          id={menuId}
-          ref={menuRef}
-          className="project-context-menu"
-          role="menu"
-          aria-label={`Actions for ${project.name}`}
-          onKeyDown={handleMenuKeyDown}
-        >
-          <button
-            type="button"
-            role="menuitem"
-            disabled={busy}
-            onClick={() => {
-              close();
-              void onExport(project.id);
-            }}
-          >
-            <span aria-hidden="true">⇩</span>
-            Export project
-          </button>
-        </div>
-      ) : null}
+      {menuContent ? createPortal(menuContent, document.body) : null}
     </div>
   );
 }
