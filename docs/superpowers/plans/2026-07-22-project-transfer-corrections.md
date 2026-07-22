@@ -206,7 +206,7 @@ Expected: every test passes.
 - [ ] **Step 3: Run the production artifact build**
 
 ```bash
-npm run build:artifact
+npm run build
 ```
 
 Expected: the production build and artifact validation both succeed.
