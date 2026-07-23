@@ -1,5 +1,7 @@
 # Project Harbor
 
+[![Tests](https://github.com/shalex88/project-harbor/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/shalex88/project-harbor/actions/workflows/test.yml?query=branch%3Amain)
+
 Project Harbor is a responsive project-management workspace for organizing
 projects into collections, tracking actionable tasks and dated events, linking
 related work, storing pinned files, and comparing estimated costs with recorded
