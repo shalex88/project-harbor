@@ -173,3 +173,9 @@ test("calendar task chips use a full-width compact status row", () => {
     /\.status-chip-compact\s*\{[\s\S]*?min-height:\s*20px;[\s\S]*?font-size:\s*9px;/,
   );
 });
+
+test("agenda rows group title and metadata in a direction-aware content column", () => {
+  const timeline = source.slice(source.indexOf("export function TimelineDashboard"), source.indexOf("export function SpendingDashboard"));
+  assert.match(timeline, /className="agenda-item-content" dir="auto"[\s\S]*?<WorkItemTitle item=\{item\} \/>[\s\S]*?<small>/);
+  assert.match(styles, /\.agenda-item-content\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto\s+auto;/);
+});
