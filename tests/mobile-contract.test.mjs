@@ -70,7 +70,7 @@ test("responsive task status styles use readable labels instead of checkboxes", 
     /\.collection-item-list > button\s*\{[\s\S]*?grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+16px;/,
   );
   assert.doesNotMatch(css, /\.agenda-item > span\s*\{/);
-  assert.match(css, /\.agenda-event > span\s*\{/);
+  assert.match(css, /\.agenda-event-label\s*\{/);
   assert.match(
     css,
     /\.agenda-event\s*\{[\s\S]*?grid-template-columns:\s*58px\s+minmax\(0,\s*1fr\);/,

@@ -177,9 +177,14 @@ test("calendar task chips use a full-width compact status row", () => {
 test("agenda rows group title and metadata in a direction-aware content column", () => {
   const timeline = source.slice(source.indexOf("export function TimelineDashboard"), source.indexOf("export function SpendingDashboard"));
   assert.match(timeline, /className="agenda-item-content" dir="auto"[\s\S]*?<WorkItemTitle item=\{item\} \/>[\s\S]*?<small>/);
+  assert.match(timeline, /className="agenda-event-label">Event<\/span>/);
   assert.match(styles, /\.agenda-item-content\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto\s+auto;/);
   assert.match(
     styles,
     /\.agenda-item\s*\{[^}]*grid-template-columns:\s*58px\s+minmax\(0,\s*1fr\);/,
+  );
+  assert.match(
+    styles,
+    /\.agenda-item-content > \.work-item-title\s*\{[^}]*direction:\s*inherit;[^}]*justify-self:\s*start;/,
   );
 });

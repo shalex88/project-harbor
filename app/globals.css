@@ -1119,7 +1119,12 @@ strong.work-item-title {
   text-align: start;
 }
 
-.agenda-event > span {
+.agenda-item-content > .work-item-title {
+  direction: inherit;
+  justify-self: start;
+}
+
+.agenda-event-label {
   grid-row: span 2;
   align-self: center;
   color: var(--cyan);
