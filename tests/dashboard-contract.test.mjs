@@ -173,3 +173,27 @@ test("calendar task chips use a full-width compact status row", () => {
     /\.status-chip-compact\s*\{[\s\S]*?min-height:\s*20px;[\s\S]*?font-size:\s*9px;/,
   );
 });
+
+test("agenda rows group title and metadata in a direction-aware content column", () => {
+  const timeline = source.slice(source.indexOf("export function TimelineDashboard"), source.indexOf("export function SpendingDashboard"));
+  assert.match(timeline, /className="agenda-item-content" dir="auto"[\s\S]*?<WorkItemTitle item=\{item\} \/>[\s\S]*?<small>/);
+  assert.match(timeline, /className="agenda-event-label">Event<\/span>/);
+  assert.match(styles, /\.agenda-item-content\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto\s+auto;/);
+  assert.match(
+    styles,
+    /\.agenda-item\s*\{[^}]*grid-template-columns:\s*58px\s+minmax\(0,\s*1fr\);/,
+  );
+  assert.match(
+    styles,
+    /\.agenda-item-content > \.work-item-title\s*\{[^}]*justify-self:\s*start;/,
+  );
+  const agendaTitleStyles = styles.slice(
+    styles.indexOf(".agenda-item-content > .work-item-title"),
+    styles.indexOf(".agenda-event-label"),
+  );
+  assert.doesNotMatch(agendaTitleStyles, /direction:\s*inherit/);
+  assert.match(
+    styles,
+    /\.agenda-item-content:dir\(rtl\) > \.work-item-title\s*\{[^}]*justify-self:\s*stretch;[^}]*direction:\s*rtl;[^}]*flex-direction:\s*row-reverse;[^}]*justify-content:\s*flex-end;/,
+  );
+});

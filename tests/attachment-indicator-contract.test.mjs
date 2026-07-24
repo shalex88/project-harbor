@@ -19,6 +19,11 @@ const projectSource = await readFile(
 test("work item titles show an accessible paperclip only for attached files", () => {
   assert.match(titleSource, /item\.files\.length\s*>\s*0/);
   assert.match(titleSource, /Has attached files/);
+  assert.match(
+    titleSource,
+    /className="attachment-indicator"\s+role="img"\s+aria-label="Has attached files"/,
+  );
+  assert.doesNotMatch(titleSource, /className="sr-only">Has attached files/);
   assert.match(titleSource, /📎/);
   assert.doesNotMatch(titleSource, /files\.length\s*\}/);
 });
