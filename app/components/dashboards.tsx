@@ -614,18 +614,20 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                       ) : (
                         <span>Event</span>
                       )}
-                      <WorkItemTitle item={item} />
-                      <small>
-                        {workItemMetadata(
-                          [
-                            projectName(snapshot, item.projectId),
-                            collectionName(snapshot, item.collectionId),
-                          ],
-                          item.id,
-                          snapshot.relations,
-                          snapshot.items,
-                        )}
-                      </small>
+                      <span className="agenda-item-content" dir="auto">
+                        <WorkItemTitle item={item} />
+                        <small>
+                          {workItemMetadata(
+                            [
+                              projectName(snapshot, item.projectId),
+                              collectionName(snapshot, item.collectionId),
+                            ],
+                            item.id,
+                            snapshot.relations,
+                            snapshot.items,
+                          )}
+                        </small>
+                      </span>
                     </button>
                   ))}
                 </div>
