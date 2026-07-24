@@ -1124,7 +1124,10 @@ strong.work-item-title {
 }
 
 .agenda-item-content:dir(rtl) > .work-item-title {
-  justify-self: end;
+  justify-self: stretch;
+  direction: rtl;
+  flex-direction: row-reverse;
+  justify-content: flex-end;
 }
 
 .agenda-event-label {

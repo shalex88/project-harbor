@@ -8,8 +8,11 @@ export function WorkItemTitle({
   return (
     <strong className="work-item-title">
       {item.files.length > 0 ? (
-        <span className="attachment-indicator">
-          <span className="sr-only">Has attached files</span>
+        <span
+          className="attachment-indicator"
+          role="img"
+          aria-label="Has attached files"
+        >
           <span aria-hidden="true">📎</span>
         </span>
       ) : null}
