@@ -192,4 +192,8 @@ test("agenda rows group title and metadata in a direction-aware content column",
     styles.indexOf(".agenda-event-label"),
   );
   assert.doesNotMatch(agendaTitleStyles, /direction:\s*inherit/);
+  assert.match(
+    styles,
+    /\.agenda-item-content:dir\(rtl\) > \.work-item-title\s*\{[^}]*justify-self:\s*end;/,
+  );
 });

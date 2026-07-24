@@ -1123,6 +1123,10 @@ strong.work-item-title {
   justify-self: start;
 }
 
+.agenda-item-content:dir(rtl) > .work-item-title {
+  justify-self: end;
+}
+
 .agenda-event-label {
   grid-row: span 2;
   align-self: center;
