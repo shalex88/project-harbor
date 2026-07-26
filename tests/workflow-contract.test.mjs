@@ -4,6 +4,7 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const itemSource = await readFile(new URL("app/components/item-sheet.tsx", root), "utf8").catch(() => "");
+const receiptActionsSource = await readFile(new URL("lib/payment-receipt-actions.ts", root), "utf8").catch(() => "");
 const relationSource = await readFile(new URL("app/components/item-relations.tsx", root), "utf8").catch(() => "");
 const itemWorkflowSource = `${itemSource}\n${relationSource}`;
 const harborSource = await readFile(new URL("app/components/harbor-app.tsx", root), "utf8").catch(() => "");
@@ -24,8 +25,9 @@ test("event form has occurrence date and no task workflow state", () => {
 });
 
 test("item sheet supports files payments receipts and mobile capture", () => {
+  const receiptSource = `${itemSource}\n${receiptActionsSource}`;
   for (const label of ["Files", "Payments", "Add payment", "Upload receipt", "Remove file"]) {
-    assert.match(itemSource, new RegExp(label));
+    assert.match(receiptSource, new RegExp(label));
   }
   assert.match(itemSource, /capture="environment"/);
 });

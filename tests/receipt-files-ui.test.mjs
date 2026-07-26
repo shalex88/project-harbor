@@ -15,6 +15,10 @@ const repositorySource = await readFile(
   new URL("lib/repository.ts", root),
   "utf8",
 );
+const receiptActionsSource = await readFile(
+  new URL("lib/payment-receipt-actions.ts", root),
+  "utf8",
+);
 
 test("uploaded files merge attachments and receipts newest first", () => {
   assert.equal(
@@ -107,6 +111,13 @@ test("Payment history keeps receipt access with uniformly aligned actions", () =
   assert.match(itemSource, /payment-actions[\s\S]*?>Receipt</);
   assert.match(itemSource, /payment-actions[\s\S]*?>Edit</);
   assert.match(itemSource, /payment-actions[\s\S]*?>Delete</);
+  assert.match(receiptActionsSource, /Upload receipt/);
+  assert.match(receiptActionsSource, /Delete receipt/);
+  assert.doesNotMatch(`${itemSource}\n${receiptActionsSource}`, /Replace receipt/);
+  assert.match(
+    itemSource,
+    /confirmReceiptDeletion\([\s\S]*?receiptAction\.fileObjectId,[\s\S]*?window\.confirm[\s\S]*?onDeleteFile/,
+  );
   assert.match(
     css,
     /\.payment-actions button,\s*\.payment-actions a\s*\{[\s\S]*?display:\s*inline-flex;[\s\S]*?align-items:\s*center;/,

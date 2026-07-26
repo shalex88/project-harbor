@@ -10,6 +10,10 @@ import {
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import { buildUploadedFiles } from "@/lib/item-uploaded-files";
+import {
+  confirmReceiptDeletion,
+  getReceiptAction,
+} from "@/lib/payment-receipt-actions";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
 
@@ -407,24 +411,46 @@ function ItemSheetContent({
           </div>
           <div className="payment-history">
             <header><h3>Payment history</h3><span>{item.payments.length} entries</span></header>
-            {item.payments.map((payment) => (
-              <article key={payment.id}>
-                <span className="payment-date">{payment.paidOn}</span>
-                <span className="row-title"><strong>{payment.note || "Payment"}</strong><small>Added by {payment.createdByName}</small></span>
-                <strong>{formatMoney(payment.amountMinor, currency)}</strong>
-                <div className="payment-actions">
-                  {payment.receiptFileId ? <a href={`/api/files?id=${encodeURIComponent(payment.receiptFileId)}`}>Receipt</a> : null}
-                  {canManagePayment(payment) ? <button type="button" onClick={() => setEditingPayment(payment)}>Edit</button> : null}
-                  {canManagePayment(payment) ? <button type="button" onClick={() => { if (window.confirm("Delete this payment?")) void onMutate({ action: "delete_payment", paymentId: payment.id }); }}>Delete</button> : null}
-                </div>
-                {canManagePayment(payment) ? (
-                  <label className="receipt-picker">
-                    {payment.receiptFileId ? "Replace receipt" : "Upload receipt"}
-                    <input type="file" accept="image/*,application/pdf" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUpload({ paymentId: payment.id }, file); }} />
-                  </label>
-                ) : null}
-              </article>
-            ))}
+            {item.payments.map((payment) => {
+              const manageable = canManagePayment(payment);
+              const receiptAction = getReceiptAction(
+                payment.receiptFileId,
+                manageable,
+              );
+              return (
+                <article key={payment.id}>
+                  <span className="payment-date">{payment.paidOn}</span>
+                  <span className="row-title"><strong>{payment.note || "Payment"}</strong><small>Added by {payment.createdByName}</small></span>
+                  <strong>{formatMoney(payment.amountMinor, currency)}</strong>
+                  <div className="payment-actions">
+                    {payment.receiptFileId ? <a href={`/api/files?id=${encodeURIComponent(payment.receiptFileId)}`}>Receipt</a> : null}
+                    {manageable ? <button type="button" onClick={() => setEditingPayment(payment)}>Edit</button> : null}
+                    {manageable ? <button type="button" onClick={() => { if (window.confirm("Delete this payment?")) void onMutate({ action: "delete_payment", paymentId: payment.id }); }}>Delete</button> : null}
+                  </div>
+                  {receiptAction?.kind === "delete" ? (
+                    <button
+                      className="receipt-picker"
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        void confirmReceiptDeletion(
+                          receiptAction.fileObjectId,
+                          (message) => window.confirm(message),
+                          onDeleteFile,
+                        )
+                      }
+                    >
+                      {receiptAction.label}
+                    </button>
+                  ) : receiptAction?.kind === "upload" ? (
+                    <label className="receipt-picker">
+                      {receiptAction.label}
+                      <input type="file" accept="image/*,application/pdf" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUpload({ paymentId: payment.id }, file); }} />
+                    </label>
+                  ) : null}
+                </article>
+              );
+            })}
             {!item.payments.length ? <EmptyState title="No payments recorded" description="Add each payment separately to build a reliable actual-spend history." /> : null}
           </div>
           <SubmitForm onSubmit={handlePayment} className="payment-form">

@@ -31,7 +31,7 @@
 - Consumes: `PaymentRecord.receiptFileId: string | null` and the existing `onDeleteFile(fileObjectId: string): Promise<void>` callback.
 - Produces: `getReceiptAction(receiptFileId, canManage)` and `confirmReceiptDeletion(fileObjectId, confirmDelete, onDeleteFile)`.
 
-- [ ] **Step 1: Write failing behavior tests**
+- [x] **Step 1: Write failing behavior tests**
 
 Create `tests/payment-receipt-actions.test.mjs`:
 
@@ -84,7 +84,7 @@ test("receipt deletion requires confirmation and passes the receipt file id", as
 Update `tests/receipt-files-ui.test.mjs` so its payment-history contract requires
 `Delete receipt`, retains `Upload receipt`, and rejects `Replace receipt`.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
 Run:
 
@@ -96,7 +96,7 @@ npx -y node@24 --experimental-strip-types --test \
 
 Expected: FAIL because `lib/payment-receipt-actions.ts` and the new delete receipt UI do not exist.
 
-- [ ] **Step 3: Implement the minimal receipt action helper**
+- [x] **Step 3: Implement the minimal receipt action helper**
 
 Create `lib/payment-receipt-actions.ts`:
 
@@ -135,7 +135,7 @@ export async function confirmReceiptDeletion(
 }
 ```
 
-- [ ] **Step 4: Render upload-or-delete in payment history**
+- [x] **Step 4: Render upload-or-delete in payment history**
 
 In `app/components/item-sheet.tsx`, import the two helpers. For each payment,
 derive `receiptAction` inside the map callback. Render:
@@ -174,7 +174,7 @@ derive `receiptAction` inside the map callback. Render:
 
 Keep the `Receipt`, `Edit`, and payment `Delete` actions unchanged.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run:
 
@@ -187,7 +187,7 @@ npx -y node@24 --experimental-strip-types --test \
 
 Expected: all focused tests pass.
 
-- [ ] **Step 6: Run full verification**
+- [x] **Step 6: Run full verification**
 
 Run the full suite with Node 24, followed by:
 
@@ -198,7 +198,7 @@ npm run validate:artifact
 
 Expected: build, all tests, lint, and artifact validation pass.
 
-- [ ] **Step 7: Commit and push**
+- [x] **Step 7: Commit and push**
 
 ```bash
 git add \
