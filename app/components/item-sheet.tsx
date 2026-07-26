@@ -9,6 +9,7 @@ import {
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import { buildUploadedFiles } from "@/lib/item-uploaded-files";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
 
@@ -122,12 +123,9 @@ function ItemSheetContent({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currency = project?.currency ?? "USD";
 
-  const itemFiles = useMemo(
-    () =>
-      [...(item?.files ?? [])].sort((a, b) =>
-        b.createdAt.localeCompare(a.createdAt),
-      ),
-    [item?.files],
+  const uploadedFiles = useMemo(
+    () => buildUploadedFiles(item?.files ?? [], item?.payments ?? []),
+    [item?.files, item?.payments],
   );
 
   if (mode.kind === "existing" && !item) {
@@ -271,7 +269,7 @@ function ItemSheetContent({
               {value === "details"
                 ? "Details"
                 : value === "files"
-                  ? `Files (${item.files.length})`
+                  ? `Files (${uploadedFiles.length})`
                   : value === "payments"
                     ? `Payments (${item.payments.length})`
                     : `Relations (${itemRelations.length})`}
@@ -367,17 +365,18 @@ function ItemSheetContent({
             ) : null}
           </div>
           <div className="file-list">
-            {itemFiles.map((file) => (
-              <article key={file.id}>
-                <span className="file-mark" aria-hidden="true">◇</span>
-                <span className="row-title"><strong>{file.filename}</strong><small>{(file.sizeBytes / 1024).toFixed(file.sizeBytes > 1024 * 1024 ? 0 : 1)} KB · {file.contentType}</small></span>
+            {uploadedFiles.map((file) => (
+              <article key={`${file.kind}-${file.id}`} className={`file-row file-row-${file.kind}`}>
+                <span className="row-title"><strong dir="auto">{file.filename}</strong><small>{file.detail}</small></span>
                 <div className="file-actions">
                   <a className="button button-secondary" href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}>Download</a>
-                  <button className="icon-button" type="button" aria-label={`Remove ${file.filename}`} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>×</button>
+                  {file.removable ? (
+                    <button className="button button-danger" type="button" onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>Remove file</button>
+                  ) : null}
                 </div>
               </article>
             ))}
-            {!itemFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, archives, or other project material to this item." /> : null}
+            {!uploadedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, receipts, archives, or other project material to this item." /> : null}
           </div>
         </section>
       ) : null}

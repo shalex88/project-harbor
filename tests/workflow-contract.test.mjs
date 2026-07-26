@@ -24,7 +24,7 @@ test("event form has occurrence date and no task workflow state", () => {
 });
 
 test("item sheet supports files payments receipts and mobile capture", () => {
-  for (const label of ["Files", "Payments", "Add payment", "Upload receipt", "Pin file"]) {
+  for (const label of ["Files", "Payments", "Add payment", "Upload receipt", "Remove file"]) {
     assert.match(itemSource, new RegExp(label));
   }
   assert.match(itemSource, /capture="environment"/);

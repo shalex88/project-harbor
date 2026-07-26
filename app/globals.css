@@ -1871,22 +1871,13 @@ strong.work-item-title {
 
 .file-list article {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--shell);
   padding: 10px;
-}
-
-.file-list article.pinned {
-  border-color: rgba(34, 211, 238, 0.55);
-}
-
-.file-mark {
-  color: var(--cyan);
-  font-size: 20px;
 }
 
 .file-actions {
@@ -1970,13 +1961,18 @@ strong.work-item-title {
 }
 
 .payment-actions button,
-.payment-actions a,
-.receipt-picker {
+.payment-actions a {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--cyan);
   cursor: pointer;
   font-size: 10px;
+  line-height: 1;
+  padding: 0 6px;
   text-decoration: none;
 }
 
@@ -1984,6 +1980,11 @@ strong.work-item-title {
   position: absolute;
   left: 14px;
   bottom: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+  font-size: 10px;
 }
 
 .payment-form {
@@ -2546,24 +2547,18 @@ strong.work-item-title {
   }
 
   .file-list article {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .file-actions {
     grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 1fr 1fr 44px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 
   .file-actions .button {
     justify-content: center;
     min-height: 44px;
-  }
-
-  .file-actions .icon-button {
-    width: 44px;
-    min-height: 44px;
-    height: 44px;
   }
 
   .payment-history article {
