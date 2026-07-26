@@ -375,7 +375,7 @@ function ItemSheetContent({
                 <div className="file-actions">
                   <a className="button button-secondary" href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}>Download</a>
                   {file.removable ? (
-                    <button className="button button-danger" type="button" onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>Remove file</button>
+                    <button className="button button-danger" type="button" disabled={pending} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>Remove file</button>
                   ) : null}
                 </div>
               </article>

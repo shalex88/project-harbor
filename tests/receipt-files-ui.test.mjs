@@ -104,6 +104,10 @@ test("uploaded files merge attachments and receipts newest first", () => {
 test("Files exposes receipt downloads and clear attachment removal", () => {
   assert.match(itemSource, /Files \(\$\{uploadedFiles\.length\}\)/);
   assert.match(itemSource, />Remove file</);
+  assert.match(
+    itemSource,
+    /file\.removable[\s\S]*?<button[\s\S]*?disabled=\{pending\}[\s\S]*?>Remove file<\/button>/,
+  );
   assert.doesNotMatch(itemSource, /Pin file|Unpin file|className="file-mark"/);
 });
 
