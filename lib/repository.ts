@@ -644,11 +644,13 @@ export async function loadWorkspaceSnapshot(
     display_name: string;
     receipt_file_id: string | null;
     receipt_filename: string | null;
+    receipt_created_at: string | null;
     created_at: string;
     updated_at: string;
   }>(
     `SELECT p.id,p.item_id,p.amount_minor,p.paid_on,p.note,p.created_by,CASE WHEN p.imported_creator_label IS NOT NULL THEN p.imported_creator_label || ' (imported)' ELSE u.display_name END AS display_name,
-            pr.file_object_id AS receipt_file_id,fo.filename AS receipt_filename,p.created_at,p.updated_at
+            pr.file_object_id AS receipt_file_id,fo.filename AS receipt_filename,
+            fo.created_at AS receipt_created_at,p.created_at,p.updated_at
      FROM payments p JOIN work_items wi ON wi.id = p.item_id
      JOIN project_members current ON current.project_id = wi.project_id
      JOIN users u ON u.id = p.created_by
@@ -703,6 +705,7 @@ export async function loadWorkspaceSnapshot(
       createdByName: row.display_name,
       receiptFileId: row.receipt_file_id,
       receiptFilename: row.receipt_filename,
+      receiptCreatedAt: row.receipt_created_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };

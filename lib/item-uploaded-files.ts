@@ -44,7 +44,7 @@ export function buildUploadedFiles(
               id: `receipt-${payment.id}`,
               fileObjectId: payment.receiptFileId,
               filename: payment.receiptFilename,
-              createdAt: payment.createdAt,
+              createdAt: payment.receiptCreatedAt ?? payment.createdAt,
               detail: `Payment receipt · ${payment.paidOn}`,
               removable: false,
             },
