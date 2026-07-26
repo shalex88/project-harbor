@@ -30,7 +30,6 @@ export function ItemSheet({
   onOpenItem,
   onStartFollowUp,
   onUpload,
-  onTogglePin,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -42,7 +41,6 @@ export function ItemSheet({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
-  onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const key =
@@ -75,7 +73,6 @@ export function ItemSheet({
           onOpenItem={onOpenItem}
           onStartFollowUp={onStartFollowUp}
           onUpload={onUpload}
-          onTogglePin={onTogglePin}
           onDeleteFile={onDeleteFile}
         />
       ) : null}
@@ -93,7 +90,6 @@ function ItemSheetContent({
   onOpenItem,
   onStartFollowUp,
   onUpload,
-  onTogglePin,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -105,7 +101,6 @@ function ItemSheetContent({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
-  onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const item = mode.kind === "existing" ? snapshot.items.find((candidate) => candidate.id === mode.itemId) ?? null : null;
@@ -127,8 +122,11 @@ function ItemSheetContent({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currency = project?.currency ?? "USD";
 
-  const pinnedFiles = useMemo(
-    () => [...(item?.files ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt.localeCompare(a.createdAt)),
+  const itemFiles = useMemo(
+    () =>
+      [...(item?.files ?? [])].sort((a, b) =>
+        b.createdAt.localeCompare(a.createdAt),
+      ),
     [item?.files],
   );
 
@@ -369,18 +367,17 @@ function ItemSheetContent({
             ) : null}
           </div>
           <div className="file-list">
-            {pinnedFiles.map((file) => (
-              <article key={file.id} className={file.pinned ? "pinned" : ""}>
-                <span className="file-mark" aria-hidden="true">{file.pinned ? "◆" : "◇"}</span>
+            {itemFiles.map((file) => (
+              <article key={file.id}>
+                <span className="file-mark" aria-hidden="true">◇</span>
                 <span className="row-title"><strong>{file.filename}</strong><small>{(file.sizeBytes / 1024).toFixed(file.sizeBytes > 1024 * 1024 ? 0 : 1)} KB · {file.contentType}</small></span>
                 <div className="file-actions">
                   <a className="button button-secondary" href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}>Download</a>
-                  <button className="button button-secondary" type="button" onClick={() => onTogglePin(file.id, !file.pinned)}>{file.pinned ? "Unpin file" : "Pin file"}</button>
                   <button className="icon-button" type="button" aria-label={`Remove ${file.filename}`} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>×</button>
                 </div>
               </article>
             ))}
-            {!pinnedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, archives, or other project material to this item." /> : null}
+            {!itemFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, archives, or other project material to this item." /> : null}
           </div>
         </section>
       ) : null}

@@ -67,7 +67,6 @@ export type ItemFileRecord = {
   filename: string;
   contentType: string;
   sizeBytes: number;
-  pinned: boolean;
   uploadedBy: string;
   uploadedByName: string;
   createdAt: string;

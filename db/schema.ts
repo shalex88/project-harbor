@@ -254,13 +254,12 @@ export const itemFiles = sqliteTable(
     fileObjectId: text("file_object_id")
       .notNull()
       .references(() => fileObjects.id, { onDelete: "cascade" }),
-    pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
     position: integer("position").notNull().default(0),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex("item_files_file_unique").on(table.fileObjectId),
-    index("item_files_item_idx").on(table.itemId, table.pinned, table.position),
+    index("item_files_item_idx").on(table.itemId, table.position),
   ],
 );
 

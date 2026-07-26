@@ -47,7 +47,7 @@ const PREVIEW_SCHEMA = [
   `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
   `CREATE TABLE IF NOT EXISTS work_item_relations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('follows_from','blocks','related_to')), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_item_id <> target_item_id), CHECK(type <> 'related_to' OR source_item_id < target_item_id), UNIQUE(project_id,type,source_item_id,target_item_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(source_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(target_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, imported_uploader_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
-  `CREATE TABLE IF NOT EXISTS item_files (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_object_id TEXT NOT NULL UNIQUE, pinned INTEGER NOT NULL DEFAULT 0, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
+  `CREATE TABLE IF NOT EXISTS item_files (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_object_id TEXT NOT NULL UNIQUE, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS payments (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, amount_minor INTEGER NOT NULL CHECK(amount_minor > 0), paid_on TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_by TEXT NOT NULL, imported_creator_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS payment_receipts (payment_id TEXT PRIMARY KEY NOT NULL, file_object_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(payment_id) REFERENCES payments(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_id)`,
@@ -58,7 +58,7 @@ const PREVIEW_SCHEMA = [
   `CREATE INDEX IF NOT EXISTS work_items_event_date_idx ON work_items(project_id,type,occurrence_date)`,
   `CREATE INDEX IF NOT EXISTS work_item_relations_source_idx ON work_item_relations(project_id,source_item_id)`,
   `CREATE INDEX IF NOT EXISTS work_item_relations_target_idx ON work_item_relations(project_id,target_item_id)`,
-  `CREATE INDEX IF NOT EXISTS item_files_item_idx ON item_files(item_id,pinned,position)`,
+  `CREATE INDEX IF NOT EXISTS item_files_item_idx ON item_files(item_id,position)`,
   `CREATE INDEX IF NOT EXISTS payments_item_date_idx ON payments(item_id,paid_on)`,
 ];
 
@@ -621,17 +621,16 @@ export async function loadWorkspaceSnapshot(
     filename: string;
     content_type: string;
     size_bytes: number;
-    pinned: number;
     uploaded_by: string;
     uploaded_by_name: string;
     created_at: string;
   }>(
-    `SELECT inf.id,inf.item_id,inf.file_object_id,fo.filename,fo.content_type,fo.size_bytes,inf.pinned,fo.uploaded_by,CASE WHEN fo.imported_uploader_label IS NOT NULL THEN fo.imported_uploader_label || ' (imported)' ELSE uploader.display_name END AS uploaded_by_name,fo.created_at
+    `SELECT inf.id,inf.item_id,inf.file_object_id,fo.filename,fo.content_type,fo.size_bytes,fo.uploaded_by,CASE WHEN fo.imported_uploader_label IS NOT NULL THEN fo.imported_uploader_label || ' (imported)' ELSE uploader.display_name END AS uploaded_by_name,fo.created_at
      FROM item_files inf JOIN file_objects fo ON fo.id = inf.file_object_id
      JOIN users uploader ON uploader.id = fo.uploaded_by
      JOIN work_items wi ON wi.id = inf.item_id
      JOIN project_members current ON current.project_id = wi.project_id
-     WHERE current.user_id = ? ORDER BY inf.pinned DESC,inf.position,fo.created_at DESC`,
+     WHERE current.user_id = ? ORDER BY fo.created_at DESC,inf.position,inf.id`,
     user.id,
   );
 
@@ -685,7 +684,6 @@ export async function loadWorkspaceSnapshot(
       filename: row.filename,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
-      pinned: Boolean(row.pinned),
       uploadedBy: row.uploaded_by,
       uploadedByName: row.uploaded_by_name,
       createdAt: row.created_at,
@@ -1363,7 +1361,7 @@ export async function createFileMetadata(input: {
   const relation = input.itemId
     ? db
         .prepare(
-          "INSERT INTO item_files (id,item_id,file_object_id,pinned,position) VALUES (?,?,?,0,0)",
+          "INSERT INTO item_files (id,item_id,file_object_id,position) VALUES (?,?,?,0)",
         )
         .bind(crypto.randomUUID(), input.itemId, input.fileId)
     : db
@@ -1403,22 +1401,6 @@ export async function authorizeFileTarget(
     return { projectId: context.projectId };
   }
   throw new DomainError("An item or payment is required");
-}
-
-export async function setItemFilePinned(
-  identity: IdentityUser,
-  itemFileId: string,
-  pinned: boolean,
-): Promise<void> {
-  await ensurePreviewSchema();
-  const user = await syncUser(identity);
-  const row = await first<{ project_id: string }>(
-    "SELECT wi.project_id FROM item_files inf JOIN work_items wi ON wi.id=inf.item_id WHERE inf.id=?",
-    itemFileId,
-  );
-  if (!row) throw new DomainError("File not found", "not_found");
-  await requireProjectAccess(user.id, row.project_id);
-  await run("UPDATE item_files SET pinned=? WHERE id=?", pinned ? 1 : 0, itemFileId);
 }
 
 export async function deleteFileMetadata(
