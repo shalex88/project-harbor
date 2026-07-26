@@ -67,7 +67,6 @@ export type ItemFileRecord = {
   filename: string;
   contentType: string;
   sizeBytes: number;
-  pinned: boolean;
   uploadedBy: string;
   uploadedByName: string;
   createdAt: string;
@@ -83,6 +82,7 @@ export type PaymentRecord = {
   createdByName: string;
   receiptFileId: string | null;
   receiptFilename: string | null;
+  receiptCreatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

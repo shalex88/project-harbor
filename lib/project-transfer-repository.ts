@@ -186,14 +186,13 @@ export async function loadProjectArchiveSource(
     filename: string;
     content_type: string;
     size_bytes: number;
-    pinned: number;
     position: number;
     uploader_label: string;
     created_at: string;
     r2_key: string;
   }>(
     `SELECT inf.id,inf.item_id,fo.filename,fo.content_type,fo.size_bytes,
-            inf.pinned,inf.position,
+            inf.position,
             COALESCE(fo.imported_uploader_label,uploader.display_name) AS uploader_label,
             fo.created_at,fo.r2_key
      FROM item_files inf
@@ -295,7 +294,6 @@ export async function loadProjectArchiveSource(
       filename: row.filename,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
-      pinned: Boolean(row.pinned),
       position: row.position,
       uploaderLabel: row.uploader_label,
       createdAt: archiveTimestamp(row.created_at),
@@ -550,14 +548,13 @@ export async function persistProjectImport(
         db
           .prepare(
             `INSERT INTO item_files
-             (id,item_id,file_object_id,pinned,position,created_at)
-             VALUES (?,?,?,?,?,?)`,
+             (id,item_id,file_object_id,position,created_at)
+             VALUES (?,?,?,?,?)`,
           )
           .bind(
             payload.itemFileId,
             payload.itemId,
             payload.fileObjectId,
-            attachment.pinned ? 1 : 0,
             attachment.position,
             attachment.createdAt,
           ),
