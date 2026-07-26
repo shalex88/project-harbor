@@ -85,7 +85,6 @@ function manifestFixture() {
         sizeBytes: 5,
         sha256:
           "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-        pinned: true,
         position: 0,
         uploaderLabel: "Original uploader",
         createdAt: "2026-07-05T10:00:00.000Z",
@@ -187,4 +186,5 @@ test("import persistence maps attribution to labels and writes one D1 batch", ()
   assert.match(source, /created_by.*ownerUserId/s);
   assert.match(source, /uploaded_by.*ownerUserId/s);
   assert.match(source, /db\.batch\(statements\)/);
+  assert.doesNotMatch(source, /\binf\.pinned\b|attachment\.pinned/);
 });
