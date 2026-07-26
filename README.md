@@ -4,8 +4,8 @@
 
 Project Harbor is a responsive project-management workspace for organizing
 projects into collections, tracking actionable tasks and dated events, linking
-related work, storing pinned files, and comparing estimated costs with recorded
-payments.
+related work, storing uploaded files and payment receipts, and comparing
+estimated costs with recorded payments.
 
 ## Prerequisites
 
