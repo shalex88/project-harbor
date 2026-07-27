@@ -29,7 +29,10 @@ export function formatTimelinePeriod(
   anchor: string,
   mode: TimelineCalendarMode,
 ): string {
-  const start = mode === "month" ? utcDate(anchor) : startOfWeek(anchor);
+  const start =
+    mode === "month"
+      ? utcDate(`${anchor.slice(0, 7)}-01`)
+      : startOfWeek(anchor);
   if (mode === "month") return monthFormatter.format(start);
 
   const end = new Date(start);

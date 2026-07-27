@@ -11,6 +11,14 @@ test("formats a month with its full year", () => {
   assert.equal(formatTimelinePeriod("2026-08-15", "month"), "August 2026");
 });
 
+test("keeps the month label aligned with the grid when the day overflows", () => {
+  assert.equal(formatTimelinePeriod("2026-02-29", "month"), "February 2026");
+});
+
+test("keeps the month label renderable when the day is malformed", () => {
+  assert.equal(formatTimelinePeriod("2026-08-foo", "month"), "August 2026");
+});
+
 test("formats a week contained in one month", () => {
   assert.equal(
     formatTimelinePeriod("2026-08-15", "week"),
