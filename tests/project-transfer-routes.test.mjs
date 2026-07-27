@@ -81,7 +81,6 @@ async function importFixture() {
         contentType: "text/plain",
         sizeBytes: attachmentBytes.byteLength,
         sha256: await sha256Hex(attachmentBytes),
-        pinned: false,
         position: 0,
         uploaderLabel: "Alex",
         createdAt: "2026-07-03T10:00:00.000Z",
@@ -278,7 +277,7 @@ test("export loads every stored payload and produces a valid Harbor archive", as
   assert.deepEqual(decoded.manifest.payments, fixture.manifest.payments);
   assert.deepEqual(decoded.manifest.attachments, fixture.manifest.attachments);
   assert.deepEqual(decoded.manifest.receipts, fixture.manifest.receipts);
-  assert.equal(decoded.manifest.attachments[0].pinned, false);
+  assert.equal("pinned" in decoded.manifest.attachments[0], false);
 });
 
 test("export reflects the source's current empty payment and file state", async () => {

@@ -69,7 +69,6 @@ function validManifest() {
         contentType: "text/plain",
         sizeBytes: 5,
         sha256: HELLO_SHA256,
-        pinned: true,
         position: 0,
         uploaderLabel: "Alex",
         createdAt: "2026-07-06T10:00:00.000Z",
@@ -85,6 +84,19 @@ test("parses a complete version-1 archive manifest", () => {
   assert.equal(manifest.project.currency, "ILS");
   assert.equal(manifest.items[0].collectionId, "collection-1");
   assert.equal(manifest.attachments[0].path, "attachments/file-1");
+});
+
+test("accepts legacy pinned state without exposing it", () => {
+  const legacy = validManifest();
+  legacy.attachments[0].pinned = true;
+  const parsed = parseProjectArchiveManifest(legacy);
+  assert.equal("pinned" in parsed.attachments[0], false);
+
+  legacy.attachments[0].pinned = "yes";
+  assert.throws(
+    () => parseProjectArchiveManifest(legacy),
+    /legacy attachment pinned state must be boolean/i,
+  );
 });
 
 test("rejects unknown fields and dangling references", () => {

@@ -84,7 +84,6 @@ export type ProjectArchiveAttachment = {
   contentType: string;
   sizeBytes: number;
   sha256: string;
-  pinned: boolean;
   position: number;
   uploaderLabel: string | null;
   createdAt: string;
@@ -356,8 +355,8 @@ function parseAttachment(input: unknown): ProjectArchiveAttachment {
     },
     "item",
   );
-  if (typeof value.pinned !== "boolean") {
-    throw new DomainError("Attachment pinned state must be boolean");
+  if ("pinned" in value && typeof value.pinned !== "boolean") {
+    throw new DomainError("Legacy attachment pinned state must be boolean");
   }
   return {
     id,
@@ -367,7 +366,6 @@ function parseAttachment(input: unknown): ProjectArchiveAttachment {
     contentType: policy.contentType,
     sizeBytes: policy.sizeBytes,
     sha256: checksum(value.sha256),
-    pinned: value.pinned,
     position: nonNegativeInteger(value.position, "Attachment position"),
     uploaderLabel: attribution(value.uploaderLabel, "Uploader label"),
     createdAt: isoTimestamp(value.createdAt, "Attachment creation time"),

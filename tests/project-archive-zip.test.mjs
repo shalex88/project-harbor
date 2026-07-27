@@ -55,7 +55,6 @@ async function validArchive() {
           contentType: "text/plain",
           sizeBytes: file.byteLength,
           sha256: await sha256Hex(file),
-          pinned: false,
           position: 0,
           uploaderLabel: "Alex",
           createdAt: "2026-07-01T10:00:00.000Z",

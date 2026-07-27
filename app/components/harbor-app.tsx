@@ -238,28 +238,6 @@ export function HarborApp({
     }
   };
 
-  const togglePin = async (itemFileId: string, pinned: boolean) => {
-    setPending(true);
-    try {
-      const next = await readResponse(
-        await fetch("/api/files", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ itemFileId, pinned }),
-        }),
-      );
-      acceptSnapshot(next);
-      pushToast(pinned ? "File pinned" : "File unpinned");
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to update the file";
-      pushToast(message, "error");
-      throw error;
-    } finally {
-      setPending(false);
-    }
-  };
-
   const deleteFile = async (fileObjectId: string) => {
     setPending(true);
     try {
@@ -578,7 +556,6 @@ export function HarborApp({
           setItemMode({ kind: "follow-up", sourceEventId, collectionId })
         }
         onUpload={upload}
-        onTogglePin={togglePin}
         onDeleteFile={deleteFile}
       />
 

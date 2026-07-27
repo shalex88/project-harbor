@@ -10,7 +10,6 @@ import {
   getUserByIdentity,
   loadWorkspaceSnapshot,
   requireProjectAccess,
-  setItemFilePinned,
 } from "@/lib/repository";
 import {
   deleteObjectsBestEffort,
@@ -110,26 +109,6 @@ export async function POST(request: Request) {
       );
     }
     throw new DomainError("Upload stage is invalid");
-  } catch (error) {
-    return errorResponse(error);
-  }
-}
-
-export async function PATCH(request: Request) {
-  try {
-    const identity = await requireAppUser();
-    const body = (await request.json()) as {
-      itemFileId?: unknown;
-      pinned?: unknown;
-    };
-    if (typeof body.itemFileId !== "string") {
-      throw new DomainError("File is required");
-    }
-    if (typeof body.pinned !== "boolean") {
-      throw new DomainError("Pinned state is required");
-    }
-    await setItemFilePinned(identity, body.itemFileId, body.pinned);
-    return Response.json(await loadWorkspaceSnapshot(identity));
   } catch (error) {
     return errorResponse(error);
   }

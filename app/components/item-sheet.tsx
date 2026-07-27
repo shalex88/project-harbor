@@ -9,6 +9,11 @@ import {
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import { buildUploadedFiles } from "@/lib/item-uploaded-files";
+import {
+  confirmReceiptDeletion,
+  getReceiptAction,
+} from "@/lib/payment-receipt-actions";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
 
@@ -30,7 +35,6 @@ export function ItemSheet({
   onOpenItem,
   onStartFollowUp,
   onUpload,
-  onTogglePin,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -42,7 +46,6 @@ export function ItemSheet({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
-  onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const key =
@@ -75,7 +78,6 @@ export function ItemSheet({
           onOpenItem={onOpenItem}
           onStartFollowUp={onStartFollowUp}
           onUpload={onUpload}
-          onTogglePin={onTogglePin}
           onDeleteFile={onDeleteFile}
         />
       ) : null}
@@ -93,7 +95,6 @@ function ItemSheetContent({
   onOpenItem,
   onStartFollowUp,
   onUpload,
-  onTogglePin,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -105,7 +106,6 @@ function ItemSheetContent({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
-  onTogglePin: (itemFileId: string, pinned: boolean) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const item = mode.kind === "existing" ? snapshot.items.find((candidate) => candidate.id === mode.itemId) ?? null : null;
@@ -127,9 +127,9 @@ function ItemSheetContent({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currency = project?.currency ?? "USD";
 
-  const pinnedFiles = useMemo(
-    () => [...(item?.files ?? [])].sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt.localeCompare(a.createdAt)),
-    [item?.files],
+  const uploadedFiles = useMemo(
+    () => buildUploadedFiles(item?.files ?? [], item?.payments ?? []),
+    [item?.files, item?.payments],
   );
 
   if (mode.kind === "existing" && !item) {
@@ -273,7 +273,7 @@ function ItemSheetContent({
               {value === "details"
                 ? "Details"
                 : value === "files"
-                  ? `Files (${item.files.length})`
+                  ? `Files (${uploadedFiles.length})`
                   : value === "payments"
                     ? `Payments (${item.payments.length})`
                     : `Relations (${itemRelations.length})`}
@@ -369,18 +369,18 @@ function ItemSheetContent({
             ) : null}
           </div>
           <div className="file-list">
-            {pinnedFiles.map((file) => (
-              <article key={file.id} className={file.pinned ? "pinned" : ""}>
-                <span className="file-mark" aria-hidden="true">{file.pinned ? "◆" : "◇"}</span>
-                <span className="row-title"><strong>{file.filename}</strong><small>{(file.sizeBytes / 1024).toFixed(file.sizeBytes > 1024 * 1024 ? 0 : 1)} KB · {file.contentType}</small></span>
+            {uploadedFiles.map((file) => (
+              <article key={`${file.kind}-${file.id}`} className={`file-row file-row-${file.kind}`}>
+                <span className="row-title"><strong dir="auto">{file.filename}</strong><small>{file.detail}</small></span>
                 <div className="file-actions">
                   <a className="button button-secondary" href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}>Download</a>
-                  <button className="button button-secondary" type="button" onClick={() => onTogglePin(file.id, !file.pinned)}>{file.pinned ? "Unpin file" : "Pin file"}</button>
-                  <button className="icon-button" type="button" aria-label={`Remove ${file.filename}`} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>×</button>
+                  {file.removable ? (
+                    <button className="button button-danger" type="button" disabled={pending} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>Remove file</button>
+                  ) : null}
                 </div>
               </article>
             ))}
-            {!pinnedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, archives, or other project material to this item." /> : null}
+            {!uploadedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, receipts, archives, or other project material to this item." /> : null}
           </div>
         </section>
       ) : null}
@@ -411,24 +411,46 @@ function ItemSheetContent({
           </div>
           <div className="payment-history">
             <header><h3>Payment history</h3><span>{item.payments.length} entries</span></header>
-            {item.payments.map((payment) => (
-              <article key={payment.id}>
-                <span className="payment-date">{payment.paidOn}</span>
-                <span className="row-title"><strong>{payment.note || "Payment"}</strong><small>Added by {payment.createdByName}</small></span>
-                <strong>{formatMoney(payment.amountMinor, currency)}</strong>
-                <div className="payment-actions">
-                  {payment.receiptFileId ? <a href={`/api/files?id=${encodeURIComponent(payment.receiptFileId)}`}>Receipt</a> : null}
-                  {canManagePayment(payment) ? <button type="button" onClick={() => setEditingPayment(payment)}>Edit</button> : null}
-                  {canManagePayment(payment) ? <button type="button" onClick={() => { if (window.confirm("Delete this payment?")) void onMutate({ action: "delete_payment", paymentId: payment.id }); }}>Delete</button> : null}
-                </div>
-                {canManagePayment(payment) ? (
-                  <label className="receipt-picker">
-                    {payment.receiptFileId ? "Replace receipt" : "Upload receipt"}
-                    <input type="file" accept="image/*,application/pdf" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUpload({ paymentId: payment.id }, file); }} />
-                  </label>
-                ) : null}
-              </article>
-            ))}
+            {item.payments.map((payment) => {
+              const manageable = canManagePayment(payment);
+              const receiptAction = getReceiptAction(
+                payment.receiptFileId,
+                manageable,
+              );
+              return (
+                <article key={payment.id}>
+                  <span className="payment-date">{payment.paidOn}</span>
+                  <span className="row-title"><strong>{payment.note || "Payment"}</strong><small>Added by {payment.createdByName}</small></span>
+                  <strong>{formatMoney(payment.amountMinor, currency)}</strong>
+                  <div className="payment-actions">
+                    {payment.receiptFileId ? <a href={`/api/files?id=${encodeURIComponent(payment.receiptFileId)}`}>Receipt</a> : null}
+                    {manageable ? <button type="button" onClick={() => setEditingPayment(payment)}>Edit</button> : null}
+                    {manageable ? <button type="button" onClick={() => { if (window.confirm("Delete this payment?")) void onMutate({ action: "delete_payment", paymentId: payment.id }); }}>Delete</button> : null}
+                  </div>
+                  {receiptAction?.kind === "delete" ? (
+                    <button
+                      className="receipt-picker"
+                      type="button"
+                      disabled={pending}
+                      onClick={() =>
+                        void confirmReceiptDeletion(
+                          receiptAction.fileObjectId,
+                          (message) => window.confirm(message),
+                          onDeleteFile,
+                        )
+                      }
+                    >
+                      {receiptAction.label}
+                    </button>
+                  ) : receiptAction?.kind === "upload" ? (
+                    <label className="receipt-picker">
+                      {receiptAction.label}
+                      <input type="file" accept="image/*,application/pdf" capture="environment" onChange={(event) => { const file = event.target.files?.[0]; if (file) void onUpload({ paymentId: payment.id }, file); }} />
+                    </label>
+                  ) : null}
+                </article>
+              );
+            })}
             {!item.payments.length ? <EmptyState title="No payments recorded" description="Add each payment separately to build a reliable actual-spend history." /> : null}
           </div>
           <SubmitForm onSubmit={handlePayment} className="payment-form">
