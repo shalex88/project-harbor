@@ -212,77 +212,215 @@ git commit -m "feat: validate locked-extension file renames"
 ### Task 2: Authenticated filename metadata update
 
 **Files:**
+- Create: `lib/file-rename-service.ts`
 - Modify: `app/api/files/route.ts`
 - Modify: `lib/repository.ts`
-- Create: `tests/file-renaming-contract.test.mjs`
+- Create: `tests/file-rename-service.test.mjs`
 
 **Interfaces:**
 - Consumes: `parseFileRenameInput(input)` and `renamedFilename(currentFilename, requestedBaseName)` from Task 1.
+- Produces: `createFileRenameService(dependencies).rename(identity, fileId, baseName): Promise<WorkspaceSnapshot>`.
 - Produces: `renameFileMetadata(identity: IdentityUser, fileId: string, baseName: string): Promise<WorkspaceSnapshot>`.
 - Produces: `PATCH /api/files?id=<fileObjectId>` returning a refreshed `WorkspaceSnapshot`.
 
-- [ ] **Step 1: Write the failing route and repository contract tests**
+- [ ] **Step 1: Write failing service behavior tests**
 
-Create `tests/file-renaming-contract.test.mjs`:
+Create `tests/file-rename-service.test.mjs`:
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const root = new URL("../", import.meta.url);
-const route = await readFile(new URL("app/api/files/route.ts", root), "utf8");
-const repository = await readFile(
-  new URL("lib/repository.ts", root),
-  "utf8",
-);
+import { createFileRenameService } from "../lib/file-rename-service.ts";
 
-test("the protected files route accepts strict PATCH rename requests", () => {
-  assert.match(route, /export async function PATCH\(request: Request\)/);
-  assert.match(route, /requireAppUser\(\)/);
-  assert.match(route, /parseFileRenameInput\(body\)/);
-  assert.match(route, /renameFileMetadata\(\s*identity,\s*fileId,\s*baseName/);
-  assert.match(route, /Request body must be valid JSON/);
+const identity = { email: "member@example.com", displayName: "Member" };
+
+function harness({
+  role = "member",
+  paymentId = null,
+  paymentCreatedBy = "member",
+} = {}) {
+  const stored = {
+    id: "file-1",
+    filename: "plans.PDF",
+    r2Key: "projects/project-1/file-1",
+    contentType: "application/pdf",
+    sizeBytes: 42,
+  };
+  const dependencies = {
+    prepare: async () => {},
+    getUser: async () => ({
+      id: "member",
+      email: identity.email,
+      displayName: identity.displayName,
+    }),
+    getFileContext: async () => ({
+      projectId: "project-1",
+      filename: stored.filename,
+      paymentId,
+    }),
+    requireProjectAccess: async () => ({
+      projectId: "project-1",
+      userId: "member",
+      role,
+    }),
+    getPaymentContext: async () => ({
+      projectId: "project-1",
+      createdBy: paymentCreatedBy,
+    }),
+    updateFilename: async (_fileId, filename) => {
+      stored.filename = filename;
+    },
+    loadSnapshot: async () => ({
+      file: { ...stored },
+    }),
+  };
+  return {
+    stored,
+    service: createFileRenameService(dependencies),
+  };
+}
+
+test("a project member renames attachment metadata without changing storage", async () => {
+  const { service, stored } = harness();
+  const before = { ...stored };
+
+  const snapshot = await service.rename(identity, "file-1", " Final plans ");
+
+  assert.equal(snapshot.file.filename, "Final plans.PDF");
+  assert.equal(stored.r2Key, before.r2Key);
+  assert.equal(stored.contentType, before.contentType);
+  assert.equal(stored.sizeBytes, before.sizeBytes);
 });
 
-test("repository rename preserves storage and enforces receipt permissions", () => {
-  const rename = repository.slice(
-    repository.indexOf("export async function renameFileMetadata"),
-    repository.indexOf("export async function deleteFileMetadata"),
+test("a member cannot rename another member's receipt", async () => {
+  const { service, stored } = harness({
+    paymentId: "payment-1",
+    paymentCreatedBy: "someone-else",
+  });
+
+  await assert.rejects(
+    () => service.rename(identity, "file-1", "Forbidden"),
+    /cannot rename this receipt/i,
   );
-  assert.match(rename, /getFileContext\(fileId\)/);
-  assert.match(rename, /requireProjectAccess\(user\.id, context\.projectId\)/);
-  assert.match(rename, /context\.paymentId/);
-  assert.match(rename, /paymentContext\(context\.paymentId\)/);
-  assert.match(rename, /canManagePayment\(actor, payment\)/);
-  assert.match(rename, /You cannot rename this receipt/);
-  assert.match(rename, /renamedFilename\(context\.filename, baseName\)/);
-  assert.match(
-    rename,
-    /UPDATE file_objects SET filename = \? WHERE id = \?/,
+  assert.equal(stored.filename, "plans.PDF");
+});
+
+test("the payment creator and project owner can rename a receipt", async () => {
+  const creator = harness({
+    paymentId: "payment-1",
+    paymentCreatedBy: "member",
+  });
+  const owner = harness({
+    role: "owner",
+    paymentId: "payment-1",
+    paymentCreatedBy: "someone-else",
+  });
+
+  assert.equal(
+    (await creator.service.rename(identity, "file-1", "Creator copy")).file
+      .filename,
+    "Creator copy.PDF",
   );
-  assert.doesNotMatch(rename, /r2_key\s*=|DELETE FROM|putObject|deleteObject/);
-  assert.match(rename, /loadWorkspaceSnapshot\(identity\)/);
+  assert.equal(
+    (await owner.service.rename(identity, "file-1", "Owner copy")).file
+      .filename,
+    "Owner copy.PDF",
+  );
 });
 ```
 
-- [ ] **Step 2: Run the focused contracts and verify RED**
+- [ ] **Step 2: Run the service test and verify RED**
+
+Run:
+
+```bash
+node --experimental-strip-types --test tests/file-rename-service.test.mjs
+```
+
+Expected: FAIL with `ERR_MODULE_NOT_FOUND` for
+`lib/file-rename-service.ts`.
+
+- [ ] **Step 3: Implement the minimal rename service**
+
+Create `lib/file-rename-service.ts`:
+
+```ts
+import { canManagePayment, type ProjectActor } from "./authorization.ts";
+import type { IdentityUser } from "./auth.ts";
+import {
+  DomainError,
+  type AppUser,
+  type WorkspaceSnapshot,
+} from "./domain.ts";
+import { renamedFilename } from "./file-renaming.ts";
+
+type FileContext = {
+  projectId: string;
+  filename: string;
+  paymentId: string | null;
+};
+
+type Dependencies = {
+  prepare(): Promise<void>;
+  getUser(identity: IdentityUser): Promise<AppUser>;
+  getFileContext(fileId: string): Promise<FileContext>;
+  requireProjectAccess(
+    userId: string,
+    projectId: string,
+  ): Promise<ProjectActor & { projectId: string }>;
+  getPaymentContext(
+    paymentId: string,
+  ): Promise<{ projectId: string; createdBy: string }>;
+  updateFilename(fileId: string, filename: string): Promise<void>;
+  loadSnapshot(identity: IdentityUser): Promise<WorkspaceSnapshot>;
+};
+
+export function createFileRenameService(dependencies: Dependencies) {
+  async function rename(
+    identity: IdentityUser,
+    fileId: string,
+    baseName: string,
+  ): Promise<WorkspaceSnapshot> {
+    await dependencies.prepare();
+    const user = await dependencies.getUser(identity);
+    const context = await dependencies.getFileContext(fileId);
+    const actor = await dependencies.requireProjectAccess(
+      user.id,
+      context.projectId,
+    );
+    if (context.paymentId) {
+      const payment = await dependencies.getPaymentContext(context.paymentId);
+      if (!canManagePayment(actor, payment)) {
+        throw new DomainError("You cannot rename this receipt", "forbidden");
+      }
+    }
+    const filename = renamedFilename(context.filename, baseName);
+    await dependencies.updateFilename(fileId, filename);
+    return dependencies.loadSnapshot(identity);
+  }
+
+  return { rename };
+}
+```
+
+- [ ] **Step 4: Run the service test and verify GREEN**
 
 Run:
 
 ```bash
 node --experimental-strip-types --test \
   tests/file-renaming.test.mjs \
-  tests/file-renaming-contract.test.mjs
+  tests/file-rename-service.test.mjs \
+  tests/authorization.test.mjs
 ```
 
-Expected: filename tests pass and both contract tests fail because PATCH and
-`renameFileMetadata` do not exist.
+Expected: all focused behavior tests pass.
 
-- [ ] **Step 3: Add the repository rename operation**
+- [ ] **Step 5: Connect the service to the repository**
 
-Import `renamedFilename` into `lib/repository.ts`, then insert immediately
-before `deleteFileMetadata`:
+Import `createFileRenameService` into `lib/repository.ts`, then insert
+immediately before `deleteFileMetadata`:
 
 ```ts
 export async function renameFileMetadata(
@@ -290,27 +428,25 @@ export async function renameFileMetadata(
   fileId: string,
   baseName: string,
 ): Promise<WorkspaceSnapshot> {
-  await ensurePreviewSchema();
-  const user = await syncUser(identity);
-  const context = await getFileContext(fileId);
-  const actor = await requireProjectAccess(user.id, context.projectId);
-  if (context.paymentId) {
-    const payment = await paymentContext(context.paymentId);
-    if (!canManagePayment(actor, payment)) {
-      throw new DomainError("You cannot rename this receipt", "forbidden");
-    }
-  }
-  const filename = renamedFilename(context.filename, baseName);
-  await run(
-    "UPDATE file_objects SET filename = ? WHERE id = ?",
-    filename,
-    fileId,
-  );
-  return loadWorkspaceSnapshot(identity);
+  return createFileRenameService({
+    prepare: ensurePreviewSchema,
+    getUser: syncUser,
+    getFileContext,
+    requireProjectAccess,
+    getPaymentContext: paymentContext,
+    updateFilename: async (targetFileId, filename) => {
+      await run(
+        "UPDATE file_objects SET filename = ? WHERE id = ?",
+        filename,
+        targetFileId,
+      );
+    },
+    loadSnapshot: loadWorkspaceSnapshot,
+  }).rename(identity, fileId, baseName);
 }
 ```
 
-- [ ] **Step 4: Add the authenticated PATCH route**
+- [ ] **Step 6: Add the authenticated PATCH route**
 
 Import `parseFileRenameInput` and `renameFileMetadata` in
 `app/api/files/route.ts`. Add:
@@ -338,27 +474,30 @@ export async function PATCH(request: Request) {
 }
 ```
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [ ] **Step 7: Run focused tests and verify route compilation**
 
 Run:
 
 ```bash
+npm run build
 node --experimental-strip-types --test \
   tests/file-renaming.test.mjs \
-  tests/file-renaming-contract.test.mjs \
+  tests/file-rename-service.test.mjs \
   tests/authorization.test.mjs \
   tests/storage-cleanup-contract.test.mjs
 ```
 
-Expected: all focused tests pass.
+Expected: the route and repository compile in the production build and all
+focused behavior tests pass.
 
-- [ ] **Step 6: Commit the protected metadata update**
+- [ ] **Step 8: Commit the protected metadata update**
 
 ```bash
 git add \
   app/api/files/route.ts \
+  lib/file-rename-service.ts \
   lib/repository.ts \
-  tests/file-renaming-contract.test.mjs
+  tests/file-rename-service.test.mjs
 git commit -m "feat: add protected file rename endpoint"
 ```
 
@@ -371,15 +510,18 @@ git commit -m "feat: add protected file rename endpoint"
 - Modify: `app/components/item-sheet.tsx`
 - Modify: `app/components/harbor-app.tsx`
 - Modify: `app/globals.css`
+- Modify: `lib/upload-client.ts`
+- Modify: `tests/upload-client.test.mjs`
 - Modify: `tests/receipt-files-ui.test.mjs`
 
 **Interfaces:**
 - Consumes: `splitFilename(filename)` from Task 1.
 - Produces: `UploadedItemFile.renameable: boolean`.
+- Produces: `renameUploadedFile({ fileObjectId, baseName, request }): Promise<WorkspaceSnapshot>`.
 - Produces: `onRenameFile(fileObjectId: string, baseName: string): Promise<void>` from `HarborApp` through `ItemSheet`.
 - Consumes: `PATCH /api/files?id=<fileObjectId>` from Task 2.
 
-- [ ] **Step 1: Write failing permission and UI contract tests**
+- [ ] **Step 1: Write failing permission and rename-client tests**
 
 Extend `tests/receipt-files-ui.test.mjs` to pass
 `{ userId: "user-1", role: "member" }` as the third
@@ -387,14 +529,9 @@ Extend `tests/receipt-files-ui.test.mjs` to pass
 assertion. The existing attachment and own receipt must both return
 `renameable: true`.
 
-Add:
+Add this behavior test to `tests/receipt-files-ui.test.mjs`:
 
 ```js
-const harborSource = await readFile(
-  new URL("app/components/harbor-app.tsx", root),
-  "utf8",
-);
-
 test("uploaded file rename permissions cover attachments and manageable receipts", () => {
   const attachments = [
     {
@@ -441,40 +578,53 @@ test("uploaded file rename permissions cover attachments and manageable receipts
   );
   assert.equal(ownerFiles.every((file) => file.renameable), true);
 });
+```
 
-test("Files exposes a locked-extension inline rename editor", () => {
-  assert.match(itemSource, /splitFilename\(file\.filename\)/);
-  assert.match(itemSource, /file\.renameable[\s\S]*?>Rename<\/button>/);
-  assert.match(itemSource, /className="file-rename-form"/);
-  assert.match(itemSource, /name="baseName"/);
-  assert.match(itemSource, /fileNameParts\.extension/);
-  assert.match(itemSource, />Save<\/button>/);
-  assert.match(itemSource, />Cancel<\/button>/);
-  assert.match(itemSource, /await onRenameFile\(file\.fileObjectId, baseName\)/);
-});
+Import `renameUploadedFile` in `tests/upload-client.test.mjs`, then add:
 
-test("the app sends baseName only and accepts the refreshed snapshot", () => {
-  assert.match(harborSource, /method:\s*"PATCH"/);
-  assert.match(harborSource, /body:\s*JSON\.stringify\(\{\s*baseName\s*\}\)/);
-  assert.match(harborSource, /acceptSnapshot\(next\)/);
-  assert.match(harborSource, /onRenameFile=\{renameFile\}/);
+```js
+test("renaming sends only the base name and returns the refreshed snapshot", async () => {
+  const calls = [];
+  const snapshot = await renameUploadedFile({
+    fileObjectId: "file/1",
+    baseName: "Quarterly plan",
+    request: async (url, init = {}) => {
+      calls.push({
+        url: String(url),
+        method: init.method,
+        contentType: new Headers(init.headers).get("Content-Type"),
+        body: JSON.parse(String(init.body)),
+      });
+      return json({ generatedAt: "2026-07-27T12:00:00.000Z" });
+    },
+  });
+
+  assert.deepEqual(calls, [
+    {
+      url: "/api/files?id=file%2F1",
+      method: "PATCH",
+      contentType: "application/json",
+      body: { baseName: "Quarterly plan" },
+    },
+  ]);
+  assert.deepEqual(snapshot, {
+    generatedAt: "2026-07-27T12:00:00.000Z",
+  });
 });
 ```
 
-Also load the stylesheet and assert `.file-rename-form`,
-`.file-rename-name`, and the mobile two-action `.file-rename-form` layout
-exist.
-
-- [ ] **Step 2: Run the UI test and verify RED**
+- [ ] **Step 2: Run focused tests and verify RED**
 
 Run:
 
 ```bash
-node --experimental-strip-types --test tests/receipt-files-ui.test.mjs
+node --experimental-strip-types --test \
+  tests/receipt-files-ui.test.mjs \
+  tests/upload-client.test.mjs
 ```
 
-Expected: FAIL because `renameable`, the inline editor, PATCH client callback,
-and rename styles do not exist.
+Expected: the permission assertion fails because `renameable` does not exist,
+and the upload-client test fails because `renameUploadedFile` is not exported.
 
 - [ ] **Step 3: Derive rename visibility in the uploaded-file builder**
 
@@ -491,21 +641,41 @@ renameable: actor ? canManagePayment(actor, payment) : false,
 
 Keep the existing merged ordering, `removable`, labels, IDs, and details.
 
-- [ ] **Step 4: Add the client rename callback**
+- [ ] **Step 4: Implement the rename request**
 
-In `app/components/harbor-app.tsx`, add beside `deleteFile`:
+Add this exported function to `lib/upload-client.ts`, reusing its existing
+`RequestAdapter` and `readResponse` boundary:
+
+```ts
+export async function renameUploadedFile({
+  fileObjectId,
+  baseName,
+  request = fetch,
+}: {
+  fileObjectId: string;
+  baseName: string;
+  request?: RequestAdapter;
+}): Promise<WorkspaceSnapshot> {
+  return readResponse<WorkspaceSnapshot>(
+    await request(`/api/files?id=${encodeURIComponent(fileObjectId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseName }),
+    }),
+  );
+}
+```
+
+- [ ] **Step 5: Add the client rename callback**
+
+Import `renameUploadedFile` in `app/components/harbor-app.tsx`, then add beside
+`deleteFile`:
 
 ```ts
 const renameFile = async (fileObjectId: string, baseName: string) => {
   setPending(true);
   try {
-    const next = await readResponse(
-      await fetch(`/api/files?id=${encodeURIComponent(fileObjectId)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ baseName }),
-      }),
-    );
+    const next = await renameUploadedFile({ fileObjectId, baseName });
     acceptSnapshot(next);
     pushToast("File renamed");
   } catch (error) {
@@ -521,7 +691,15 @@ const renameFile = async (fileObjectId: string, baseName: string) => {
 
 Pass it to `ItemSheet` as `onRenameFile={renameFile}`.
 
-- [ ] **Step 5: Render the inline editor**
+- [ ] **Step 6: Verify the browser flow is RED before rendering the editor**
+
+Start the development app, upload an attachment to an existing item, and use
+browser automation to locate a `Rename` button in its Files row.
+
+Expected: the assertion fails because the existing row has only Download and
+Remove file. Keep the same browser flow for the GREEN check in Task 4.
+
+- [ ] **Step 7: Render the inline editor**
 
 In `app/components/item-sheet.tsx`:
 
@@ -600,7 +778,7 @@ The normal action group adds:
 ) : null}
 ```
 
-- [ ] **Step 6: Style desktop and mobile editors**
+- [ ] **Step 8: Style desktop and mobile editors**
 
 Add desktop rules near the existing file-list styles:
 
@@ -661,21 +839,22 @@ Inside the existing mobile media query, add:
 }
 ```
 
-- [ ] **Step 7: Run focused UI tests and verify GREEN**
+- [ ] **Step 9: Run focused behavior tests and verify GREEN**
 
 Run:
 
 ```bash
 node --experimental-strip-types --test \
   tests/file-renaming.test.mjs \
-  tests/file-renaming-contract.test.mjs \
+  tests/file-rename-service.test.mjs \
   tests/receipt-files-ui.test.mjs \
+  tests/upload-client.test.mjs \
   tests/authorization.test.mjs
 ```
 
 Expected: all focused tests pass.
 
-- [ ] **Step 8: Commit the inline editor**
+- [ ] **Step 10: Commit the inline editor**
 
 ```bash
 git add \
@@ -683,7 +862,9 @@ git add \
   app/components/item-sheet.tsx \
   app/globals.css \
   lib/item-uploaded-files.ts \
-  tests/receipt-files-ui.test.mjs
+  lib/upload-client.ts \
+  tests/receipt-files-ui.test.mjs \
+  tests/upload-client.test.mjs
 git commit -m "feat: rename uploaded files inline"
 ```
 
