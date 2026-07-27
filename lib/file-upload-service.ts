@@ -5,6 +5,7 @@ import {
   expectedChunkCount,
   expectedChunkSize,
   parseUploadSessionManifest,
+  uploadClaimKey,
   uploadChunkKey,
   uploadManifestKey,
   type UploadSessionManifest,
@@ -90,6 +91,7 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
       const manifest = parseUploadSessionManifest(
         JSON.parse(decoder.decode(bytes)),
       );
+      if (manifest.uploadId !== uploadId) return uploadError();
       if (
         dependencies.now().getTime() - Date.parse(manifest.createdAt) >=
         EXPIRES_AFTER_MS
@@ -275,6 +277,10 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
       if (finalKey && !metadataCreated) rollbackKeys.push(finalKey);
       await dependencies.deleteObjectsBestEffort(rollbackKeys);
       throw error;
+    } finally {
+      await dependencies.deleteObjectsBestEffort([
+        uploadClaimKey(uploadId),
+      ]);
     }
   }
 
