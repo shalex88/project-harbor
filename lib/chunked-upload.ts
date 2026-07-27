@@ -58,9 +58,10 @@ export function expectedChunkSize(sizeBytes: number, index: number): number {
 }
 
 export async function readUploadChunk(
-  request: Pick<Request, "headers" | "arrayBuffer">,
+  request: Pick<Request, "headers" | "body">,
 ): Promise<Uint8Array> {
   const declaredLength = request.headers.get("Content-Length");
+  let declaredSize: number | null = null;
   if (declaredLength !== null) {
     const size = Number(declaredLength);
     if (
@@ -70,8 +71,33 @@ export async function readUploadChunk(
     ) {
       throw new DomainError("Upload chunk size is invalid");
     }
+    declaredSize = size;
   }
-  return new Uint8Array(await request.arrayBuffer());
+  if (!request.body) throw new DomainError("Upload chunk size is invalid");
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > UPLOAD_CHUNK_BYTES) {
+      await reader.cancel();
+      throw new DomainError("Upload chunk size is invalid");
+    }
+    chunks.push(value);
+  }
+  if (size === 0) throw new DomainError("Upload chunk size is invalid");
+  if (declaredSize !== null && declaredSize !== size) {
+    throw new DomainError("Upload chunk size is invalid");
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 export function uploadManifestKey(uploadId: string): string {

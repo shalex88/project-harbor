@@ -44,9 +44,9 @@ test("rejects a declared oversized chunk before reading its body", async () => {
     headers: new Headers({
       "Content-Length": String(UPLOAD_CHUNK_BYTES + 1),
     }),
-    async arrayBuffer() {
+    get body() {
       bodyRead = true;
-      return new ArrayBuffer(0);
+      throw new Error("body must not be accessed");
     },
   };
 
@@ -55,6 +55,49 @@ test("rejects a declared oversized chunk before reading its body", async () => {
     /chunk size is invalid/i,
   );
   assert.equal(bodyRead, false);
+});
+
+test("rejects actual chunk bytes above 512 KiB without a length header", async () => {
+  let cancelled = false;
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new Uint8Array(UPLOAD_CHUNK_BYTES));
+      controller.enqueue(new Uint8Array([1]));
+    },
+    cancel() {
+      cancelled = true;
+    },
+  });
+  const request = { headers: new Headers(), body };
+
+  await assert.rejects(
+    () => readUploadChunk(request),
+    /chunk size is invalid/i,
+  );
+  assert.equal(cancelled, true);
+});
+
+test("rejects a chunk when declared and actual sizes differ", async () => {
+  const request = new Request("http://localhost/api/files?stage=chunk", {
+    method: "POST",
+    headers: { "Content-Length": "2" },
+    body: new Uint8Array([1, 2, 3]),
+  });
+
+  await assert.rejects(
+    () => readUploadChunk(request),
+    /chunk size is invalid/i,
+  );
+});
+
+test("accepts a matching declared size for a smaller final chunk", async () => {
+  const request = new Request("http://localhost/api/files?stage=chunk", {
+    method: "POST",
+    headers: { "Content-Length": "3" },
+    body: new Uint8Array([7, 8, 9]),
+  });
+
+  assert.deepEqual(await readUploadChunk(request), new Uint8Array([7, 8, 9]));
 });
 
 test("parses a strict upload manifest", () => {
