@@ -37,7 +37,7 @@
 - Produces: `renamedFilename(currentFilename: string, requestedBaseName: string): string`.
 - Consumes: `DomainError` from `lib/domain.ts`.
 
-- [ ] **Step 1: Write the failing filename behavior tests**
+- [x] **Step 1: Write the failing filename behavior tests**
 
 Create `tests/file-renaming.test.mjs`:
 
@@ -50,7 +50,6 @@ import {
   renamedFilename,
   splitFilename,
 } from "../lib/file-renaming.ts";
-import { downloadHeaders } from "../lib/storage.ts";
 
 test("filename splitting locks only the final non-empty extension", () => {
   assert.deepEqual(splitFilename("report.pdf"), {
@@ -110,20 +109,9 @@ test("renaming rejects empty, unsafe, and overlong final names", () => {
   );
 });
 
-test("download headers use the renamed metadata filename", () => {
-  const headers = downloadHeaders({
-    filename: "Quarterly plan.pdf",
-    contentType: "application/pdf",
-    sizeBytes: 42,
-  });
-  assert.match(
-    headers.get("Content-Disposition") ?? "",
-    /filename\*=UTF-8''Quarterly%20plan\.pdf/,
-  );
-});
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run:
 
@@ -133,7 +121,7 @@ node --experimental-strip-types --test tests/file-renaming.test.mjs
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `lib/file-renaming.ts`.
 
-- [ ] **Step 3: Implement the minimal shared filename module**
+- [x] **Step 3: Implement the minimal shared filename module**
 
 Create `lib/file-renaming.ts`:
 
@@ -190,7 +178,7 @@ export function renamedFilename(
 }
 ```
 
-- [ ] **Step 4: Run the test and verify GREEN**
+- [x] **Step 4: Run the test and verify GREEN**
 
 Run:
 
@@ -198,9 +186,11 @@ Run:
 node --experimental-strip-types --test tests/file-renaming.test.mjs
 ```
 
-Expected: 5 tests pass.
+Expected: 4 tests pass. Download filename propagation is exercised through
+the real endpoint in Task 4 because direct Node execution cannot load the
+pre-existing extensionless imports in `lib/storage.ts`.
 
-- [ ] **Step 5: Commit the filename boundary**
+- [x] **Step 5: Commit the filename boundary**
 
 ```bash
 git add lib/file-renaming.ts tests/file-renaming.test.mjs
