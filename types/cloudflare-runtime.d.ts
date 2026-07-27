@@ -20,14 +20,28 @@ interface R2ObjectBody {
   body: ReadableStream<Uint8Array>;
 }
 
+interface R2Objects {
+  objects: Array<{ key: string }>;
+  truncated: boolean;
+  cursor?: string;
+}
+
 interface R2Bucket {
   put(
     key: string,
     value: unknown,
-    options?: { httpMetadata?: { contentType?: string } },
-  ): Promise<unknown>;
+    options?: {
+      httpMetadata?: { contentType?: string };
+      onlyIf?: { etagDoesNotMatch?: string };
+    },
+  ): Promise<unknown | null>;
   get(key: string): Promise<R2ObjectBody | null>;
   delete(key: string): Promise<void>;
+  list(options: {
+    prefix?: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<R2Objects>;
 }
 
 interface Fetcher {

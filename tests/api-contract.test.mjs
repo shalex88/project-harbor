@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseMutation } from "../lib/mutations.ts";
-import { validateUpload } from "../lib/upload-policy.ts";
+import {
+  validateArchiveUpload,
+  validateUpload,
+} from "../lib/upload-policy.ts";
 
 test("workspace mutation parser rejects unknown actions", () => {
   assert.throws(
@@ -167,11 +170,11 @@ test("upload policy rejects executables and oversized item files", () => {
         },
         "item",
       ),
-    /25 MB/,
+    /5 MB/,
   );
 });
 
-test("receipt policy accepts images and PDFs up to 10 MB", () => {
+test("receipt policy accepts images and PDFs", () => {
   assert.deepEqual(
     validateUpload(
       { name: "receipt.pdf", type: "application/pdf", size: 124_000 },
@@ -190,5 +193,52 @@ test("receipt policy accepts images and PDFs up to 10 MB", () => {
         "receipt",
       ),
     /image or PDF/,
+  );
+});
+
+test("all uploads use one 5 MiB maximum", () => {
+  const maximum = 5 * 1024 * 1024;
+  for (const [kind, type] of [
+    ["item", "application/pdf"],
+    ["receipt", "application/pdf"],
+  ]) {
+    assert.equal(
+      validateUpload({ name: "document.pdf", type, size: maximum }, kind)
+        .sizeBytes,
+      maximum,
+    );
+    assert.throws(
+      () =>
+        validateUpload(
+          { name: "document.pdf", type, size: maximum + 1 },
+          kind,
+        ),
+      /5 MB/,
+    );
+  }
+});
+
+test("project archives preserve their existing attachment and receipt limits", () => {
+  assert.equal(
+    validateArchiveUpload(
+      {
+        name: "attachment.pdf",
+        type: "application/pdf",
+        size: 25 * 1024 * 1024,
+      },
+      "item",
+    ).sizeBytes,
+    25 * 1024 * 1024,
+  );
+  assert.equal(
+    validateArchiveUpload(
+      {
+        name: "receipt.pdf",
+        type: "application/pdf",
+        size: 10 * 1024 * 1024,
+      },
+      "receipt",
+    ).sizeBytes,
+    10 * 1024 * 1024,
   );
 });

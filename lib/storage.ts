@@ -1,4 +1,11 @@
 import { getPlatformEnv } from "./platform-env";
+import {
+  parseUploadSessionManifest,
+  uploadClaimKey,
+  uploadChunkKey,
+  uploadManifestKey,
+  type UploadSessionManifest,
+} from "./chunked-upload";
 
 function bucket(): R2Bucket {
   const { BUCKET } = getPlatformEnv();
@@ -26,6 +33,21 @@ export async function putObjectBytes(
   await bucket().put(key, bytes, {
     httpMetadata: { contentType },
   });
+}
+
+export async function claimUpload(
+  uploadId: string,
+  createdAt: string,
+): Promise<boolean> {
+  const result = await bucket().put(
+    uploadClaimKey(uploadId),
+    new TextEncoder().encode(createdAt),
+    {
+      httpMetadata: { contentType: "text/plain" },
+      onlyIf: { etagDoesNotMatch: "*" },
+    },
+  );
+  return result !== null;
 }
 
 export async function getObject(key: string): Promise<R2ObjectBody | null> {
@@ -65,6 +87,33 @@ export async function deleteObjectsBestEffort(keys: string[]): Promise<void> {
     );
     pending = pending.filter((_, index) => results[index]?.status === "rejected");
   }
+}
+
+export async function listObjectKeys(
+  prefix: string,
+  limit: number,
+  cursor?: string,
+): Promise<{ keys: string[]; cursor: string | null }> {
+  const result = await bucket().list({
+    prefix,
+    limit,
+    ...(cursor ? { cursor } : {}),
+  });
+  return {
+    keys: result.objects.map((object) => object.key),
+    cursor: result.truncated ? (result.cursor ?? null) : null,
+  };
+}
+
+export async function deleteUploadObjectsBestEffort(
+  input: UploadSessionManifest,
+): Promise<void> {
+  const manifest = parseUploadSessionManifest(input);
+  const keys = [uploadManifestKey(manifest.uploadId)];
+  for (let index = 0; index < manifest.chunkCount; index += 1) {
+    keys.push(uploadChunkKey(manifest.uploadId, index));
+  }
+  await deleteObjectsBestEffort(keys);
 }
 
 export function downloadHeaders(input: {
