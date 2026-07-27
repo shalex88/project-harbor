@@ -944,7 +944,7 @@ git commit -m "fix: polish uploaded file renaming"
 
 If no fixes were required, do not create an empty commit.
 
-- [ ] **Step 5: Push and open the pull request**
+- [x] **Step 5: Push and open the pull request**
 
 ```bash
 git push -u origin feat/rename-uploaded-files
