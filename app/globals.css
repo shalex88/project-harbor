@@ -1030,9 +1030,19 @@ strong.work-item-title {
   color: var(--cyan);
 }
 
-.timeline-period-controls {
+.timeline-period-controls,
+.timeline-period-navigation {
   display: flex;
+  align-items: center;
   gap: 6px;
+}
+
+.timeline-period-label {
+  min-width: 164px;
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .agenda-sort-button {
@@ -2471,6 +2481,16 @@ strong.work-item-title {
   }
 
   .timeline-period-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-period-label {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .timeline-period-navigation {
     display: grid;
     grid-template-columns: 44px 1fr 44px;
   }

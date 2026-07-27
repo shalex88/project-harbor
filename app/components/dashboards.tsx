@@ -21,6 +21,7 @@ import {
 import { isPastAgendaDate } from "./agenda-date-state";
 import { localDateIso } from "./current-date";
 import { TaskStatusChip } from "./task-status-chip";
+import { TimelinePeriodControls } from "./timeline-period-label";
 import { EmptyState, MetricCard } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
 import type { AppRoute } from "./app-shell";
@@ -544,11 +545,13 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
           ))}
         </div>
         {mode !== "agenda" ? (
-          <div className="timeline-period-controls">
-            <button className="icon-button" type="button" aria-label="Previous period" onClick={() => setAnchor(shiftAnchor(anchor, mode, -1))}>‹</button>
-            <button className="button button-secondary" type="button" onClick={() => setAnchor(todayIso())}>Today</button>
-            <button className="icon-button" type="button" aria-label="Next period" onClick={() => setAnchor(shiftAnchor(anchor, mode, 1))}>›</button>
-          </div>
+          <TimelinePeriodControls
+            anchor={anchor}
+            mode={mode}
+            onPrevious={() => setAnchor(shiftAnchor(anchor, mode, -1))}
+            onToday={() => setAnchor(todayIso())}
+            onNext={() => setAnchor(shiftAnchor(anchor, mode, 1))}
+          />
         ) : null}
         <FilterSelect label="Filter timeline by project" value={projectId} onChange={(value) => { setProjectId(value); setCollectionId("all"); }}>
           <option value="all">All projects</option>
