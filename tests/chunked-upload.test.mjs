@@ -8,6 +8,7 @@ import {
   expectedChunkCount,
   expectedChunkSize,
   parseUploadSessionManifest,
+  readUploadChunk,
   uploadChunkKey,
   uploadManifestKey,
 } from "../lib/chunked-upload.ts";
@@ -35,6 +36,25 @@ test("calculates exact chunk counts and sizes", () => {
   assert.equal(expectedChunkCount(5 * 1024 * 1024), 10);
   assert.equal(expectedChunkSize(512 * 1024 + 1, 0), 512 * 1024);
   assert.equal(expectedChunkSize(512 * 1024 + 1, 1), 1);
+});
+
+test("rejects a declared oversized chunk before reading its body", async () => {
+  let bodyRead = false;
+  const request = {
+    headers: new Headers({
+      "Content-Length": String(UPLOAD_CHUNK_BYTES + 1),
+    }),
+    async arrayBuffer() {
+      bodyRead = true;
+      return new ArrayBuffer(0);
+    },
+  };
+
+  await assert.rejects(
+    () => readUploadChunk(request),
+    /chunk size is invalid/i,
+  );
+  assert.equal(bodyRead, false);
 });
 
 test("parses a strict upload manifest", () => {

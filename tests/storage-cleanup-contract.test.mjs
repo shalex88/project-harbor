@@ -47,7 +47,6 @@ test("file uploads use explicit chunk stages while preserving other file methods
   assert.match(fileRoute, /stage === "init"/);
   assert.match(fileRoute, /stage === "chunk"/);
   assert.match(fileRoute, /stage === "complete"/);
-  assert.match(fileRoute, /request\.arrayBuffer\(\)/);
   assert.doesNotMatch(fileRoute, /request\.formData\(\)/);
   assert.match(fileRoute, /searchParams\.get\("uploadId"\)/);
   assert.match(fileRoute, /fileUploadService\.cancel/);

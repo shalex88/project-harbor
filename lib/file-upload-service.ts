@@ -133,7 +133,7 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
         continue;
       }
       if (
-        dependencies.now().getTime() - Date.parse(manifest.createdAt) >
+        dependencies.now().getTime() - Date.parse(manifest.createdAt) >=
         EXPIRES_AFTER_MS
       ) {
         await cleanupManifest(manifest);

@@ -104,6 +104,40 @@ test("a failed chunk prevents completion and cancels the session", async () => {
   );
 });
 
+test("a completion conflict does not cancel the claimed session", async () => {
+  const calls = [];
+  const request = async (url, init = {}) => {
+    calls.push({ url: String(url), method: init.method });
+    if (String(url).includes("stage=init")) {
+      return json({ uploadId, chunkSize: 512 * 1024 }, 201);
+    }
+    if (String(url).includes("stage=chunk")) {
+      return json({ ok: true });
+    }
+    if (String(url).includes("stage=complete")) {
+      return json({ error: "Upload is already being completed" }, 409);
+    }
+    return json({ ok: true });
+  };
+
+  await assert.rejects(
+    () =>
+      uploadFileInChunks({
+        target: { itemId: "item-1" },
+        file: new File([new Uint8Array(10)], "plans.pdf", {
+          type: "application/pdf",
+        }),
+        request,
+        onProgress: () => {},
+      }),
+    /already being completed/,
+  );
+  assert.equal(
+    calls.some((call) => call.method === "DELETE"),
+    false,
+  );
+});
+
 test("preserves JSON errors and explains non-JSON gateway failures", async () => {
   const file = new File([new Uint8Array(10)], "plans.pdf", {
     type: "application/pdf",

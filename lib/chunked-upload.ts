@@ -57,6 +57,23 @@ export function expectedChunkSize(sizeBytes: number, index: number): number {
     : UPLOAD_CHUNK_BYTES;
 }
 
+export async function readUploadChunk(
+  request: Pick<Request, "headers" | "arrayBuffer">,
+): Promise<Uint8Array> {
+  const declaredLength = request.headers.get("Content-Length");
+  if (declaredLength !== null) {
+    const size = Number(declaredLength);
+    if (
+      !/^[1-9]\d*$/.test(declaredLength) ||
+      !Number.isSafeInteger(size) ||
+      size > UPLOAD_CHUNK_BYTES
+    ) {
+      throw new DomainError("Upload chunk size is invalid");
+    }
+  }
+  return new Uint8Array(await request.arrayBuffer());
+}
+
 export function uploadManifestKey(uploadId: string): string {
   if (!UUID_PATTERN.test(uploadId)) invalidManifest();
   return `_upload-manifests/${uploadId}.json`;

@@ -63,6 +63,7 @@ export async function uploadFileInChunks({
 
   onProgress(0);
   let uploadId: string | null = null;
+  let completionStarted = false;
   try {
     const initiated = await readResponse<{
       uploadId?: unknown;
@@ -107,6 +108,7 @@ export async function uploadFileInChunks({
       onProgress(Math.min(99, Math.round((uploadedBytes / file.size) * 100)));
     }
 
+    completionStarted = true;
     const snapshot = await readResponse<WorkspaceSnapshot>(
       await request(
         `/api/files?stage=complete&uploadId=${encodeURIComponent(uploadId)}`,
@@ -116,7 +118,7 @@ export async function uploadFileInChunks({
     onProgress(100);
     return snapshot;
   } catch (error) {
-    if (uploadId) {
+    if (uploadId && !completionStarted) {
       try {
         await request(
           `/api/files?uploadId=${encodeURIComponent(uploadId)}`,

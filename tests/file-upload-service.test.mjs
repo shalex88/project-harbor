@@ -171,7 +171,7 @@ test("cancellation requires ownership and removes a session", async () => {
   assert.equal(h.objects.has(uploadManifestKey(initiated.uploadId)), false);
 });
 
-test("expired cleanup is bounded to manifest listings", async () => {
+test("cleanup removes a session at exactly 24 hours and remains bounded", async () => {
   const h = harness();
   const uploadId = "5a6cf3ea-1cee-4e33-9486-80e3f03db343";
   const manifest = {
@@ -185,7 +185,7 @@ test("expired cleanup is bounded to manifest listings", async () => {
     contentType: "application/pdf",
     sizeBytes: 1,
     chunkCount: 1,
-    createdAt: "2026-07-25T00:00:00.000Z",
+    createdAt: "2026-07-26T12:00:00.000Z",
   };
   h.objects.set(
     uploadManifestKey(uploadId),

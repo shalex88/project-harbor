@@ -1,4 +1,5 @@
 import { requireAppUser } from "@/lib/auth";
+import { readUploadChunk } from "@/lib/chunked-upload";
 import { DomainError } from "@/lib/domain";
 import { errorResponse } from "@/lib/http";
 import { createFileUploadService } from "@/lib/file-upload-service";
@@ -98,7 +99,7 @@ export async function POST(request: Request) {
         identity,
         uploadId,
         Number(rawIndex),
-        new Uint8Array(await request.arrayBuffer()),
+        await readUploadChunk(request),
       );
       return Response.json({ ok: true });
     }
