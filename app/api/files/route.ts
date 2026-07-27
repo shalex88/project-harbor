@@ -4,6 +4,7 @@ import {
   readUploadChunk,
 } from "@/lib/chunked-upload";
 import { DomainError } from "@/lib/domain";
+import { parseFileRenameInput } from "@/lib/file-renaming";
 import { errorResponse } from "@/lib/http";
 import { createFileUploadService } from "@/lib/file-upload-service";
 import {
@@ -13,6 +14,7 @@ import {
   getFileContext,
   getUserByIdentity,
   loadWorkspaceSnapshot,
+  renameFileMetadata,
   requireProjectAccess,
 } from "@/lib/repository";
 import {
@@ -94,6 +96,27 @@ export async function POST(request: Request) {
       );
     }
     throw new DomainError("Upload stage is invalid");
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const identity = await requireAppUser();
+    const fileId = new URL(request.url).searchParams.get("id");
+    if (!fileId) throw new DomainError("File is required");
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      throw new DomainError("Request body must be valid JSON");
+    }
+    const { baseName } = parseFileRenameInput(body);
+    return Response.json(
+      await renameFileMetadata(identity, fileId, baseName),
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   } catch (error) {
     return errorResponse(error);
   }

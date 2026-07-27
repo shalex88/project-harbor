@@ -213,7 +213,7 @@ git commit -m "feat: validate locked-extension file renames"
 - Produces: `renameFileMetadata(identity: IdentityUser, fileId: string, baseName: string): Promise<WorkspaceSnapshot>`.
 - Produces: `PATCH /api/files?id=<fileObjectId>` returning a refreshed `WorkspaceSnapshot`.
 
-- [ ] **Step 1: Write failing service behavior tests**
+- [x] **Step 1: Write failing service behavior tests**
 
 Create `tests/file-rename-service.test.mjs`:
 
@@ -320,7 +320,7 @@ test("the payment creator and project owner can rename a receipt", async () => {
 });
 ```
 
-- [ ] **Step 2: Run the service test and verify RED**
+- [x] **Step 2: Run the service test and verify RED**
 
 Run:
 
@@ -331,7 +331,7 @@ node --experimental-strip-types --test tests/file-rename-service.test.mjs
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for
 `lib/file-rename-service.ts`.
 
-- [ ] **Step 3: Implement the minimal rename service**
+- [x] **Step 3: Implement the minimal rename service**
 
 Create `lib/file-rename-service.ts`:
 
@@ -394,7 +394,7 @@ export function createFileRenameService(dependencies: Dependencies) {
 }
 ```
 
-- [ ] **Step 4: Run the service test and verify GREEN**
+- [x] **Step 4: Run the service test and verify GREEN**
 
 Run:
 
@@ -407,7 +407,7 @@ node --experimental-strip-types --test \
 
 Expected: all focused behavior tests pass.
 
-- [ ] **Step 5: Connect the service to the repository**
+- [x] **Step 5: Connect the service to the repository**
 
 Import `createFileRenameService` into `lib/repository.ts`, then insert
 immediately before `deleteFileMetadata`:
@@ -436,7 +436,7 @@ export async function renameFileMetadata(
 }
 ```
 
-- [ ] **Step 6: Add the authenticated PATCH route**
+- [x] **Step 6: Add the authenticated PATCH route**
 
 Import `parseFileRenameInput` and `renameFileMetadata` in
 `app/api/files/route.ts`. Add:
@@ -464,7 +464,7 @@ export async function PATCH(request: Request) {
 }
 ```
 
-- [ ] **Step 7: Run focused tests and verify route compilation**
+- [x] **Step 7: Run focused tests and verify route compilation**
 
 Run:
 
@@ -480,7 +480,7 @@ node --experimental-strip-types --test \
 Expected: the route and repository compile in the production build and all
 focused behavior tests pass.
 
-- [ ] **Step 8: Commit the protected metadata update**
+- [x] **Step 8: Commit the protected metadata update**
 
 ```bash
 git add \
