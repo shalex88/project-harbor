@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 import {
   formatMoney,
   moneyInputValue,
@@ -134,16 +134,12 @@ function ItemSheetContent({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currency = project?.currency ?? "USD";
 
-  const uploadedFiles = useMemo(
-    () =>
-      buildUploadedFiles(
-        item?.files ?? [],
-        item?.payments ?? [],
-        project
-          ? { userId: snapshot.user.id, role: project.role }
-          : null,
-      ),
-    [item?.files, item?.payments, project, snapshot.user.id],
+  const uploadedFiles = buildUploadedFiles(
+    item?.files ?? [],
+    item?.payments ?? [],
+    project
+      ? { userId: snapshot.user.id, role: project.role }
+      : null,
   );
 
   if (mode.kind === "existing" && !item) {

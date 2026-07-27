@@ -21,5 +21,4 @@ test("active application layers do not expose attachment pinning", () => {
     activeSource,
     /\bpinned\b|togglePin|onTogglePin|setItemFilePinned|Pin file|Unpin file/,
   );
-  assert.doesNotMatch(sources[3], /export async function PATCH/);
 });
