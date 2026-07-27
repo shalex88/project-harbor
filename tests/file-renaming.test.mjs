@@ -47,6 +47,10 @@ test("renaming trims the base and preserves the exact stored extension", () => {
     renamedFilename("archive.tar.GZ", "  final.archive  "),
     "final.archive.GZ",
   );
+  assert.equal(
+    renamedFilename("report.pdf", "archive.exe"),
+    "archive.exe.pdf",
+  );
   assert.equal(renamedFilename("README", " Release notes "), "Release notes");
   assert.equal(renamedFilename(".env", "production"), "production");
 });
@@ -55,6 +59,29 @@ test("renaming rejects empty, unsafe, and overlong final names", () => {
   assert.throws(() => renamedFilename("report.pdf", "   "), /required/i);
   assert.throws(() => renamedFilename("report.pdf", "../secret"), /unsafe/i);
   assert.throws(() => renamedFilename("report.pdf", "bad\u0000name"), /unsafe/i);
+  assert.throws(() => renamedFilename("report.pdf", "bad\u0085name"), /unsafe/i);
+  assert.throws(() => renamedFilename("report.pdf", "safe\u202Efdp"), /unsafe/i);
+  assert.throws(
+    () => renamedFilename("README", "run.exe"),
+    /extension cannot be changed/i,
+  );
+  assert.throws(
+    () => renamedFilename(".env", "script.JS"),
+    /extension cannot be changed/i,
+  );
+  assert.throws(
+    () => renamedFilename("README", ".exe"),
+    /executable file type is unsupported/i,
+  );
+  assert.throws(
+    () => renamedFilename(".env", ".JS"),
+    /executable file type is unsupported/i,
+  );
+  assert.throws(
+    () => renamedFilename("README", "run.exe."),
+    /executable file type is unsupported/i,
+  );
+  assert.equal(renamedFilename("README", ".notes"), ".notes");
   assert.throws(
     () => renamedFilename("report.pdf", "x".repeat(157)),
     /160 characters or less/i,

@@ -1,7 +1,9 @@
 import { DomainError } from "./domain.ts";
+import { assertSupportedFilename } from "./file-safety.ts";
 
 const MAX_FILENAME_LENGTH = 160;
-const UNSAFE_BASE_NAME = /[\/\\\u0000-\u001f\u007f]/;
+const UNSAFE_BASE_NAME =
+  /[\/\\\u0000-\u001f\u007f-\u009f\u061c\u200e-\u200f\u202a-\u202e\u2066-\u2069]/;
 
 type RenameInput = { baseName: string };
 
@@ -42,7 +44,11 @@ export function renamedFilename(
     throw new DomainError("File name contains unsafe characters");
   }
   const { extension } = splitFilename(currentFilename);
+  if (!extension && splitFilename(baseName).extension) {
+    throw new DomainError("File extension cannot be changed");
+  }
   const filename = `${baseName}${extension}`;
+  assertSupportedFilename(filename);
   if (filename.length > MAX_FILENAME_LENGTH) {
     throw new DomainError("File name must be 160 characters or less");
   }

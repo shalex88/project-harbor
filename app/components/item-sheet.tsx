@@ -382,6 +382,8 @@ function ItemSheetContent({
             {uploadedFiles.map((file) => {
               const fileNameParts = splitFilename(file.filename);
               const isRenaming = renamingFileId === file.fileObjectId;
+              const extensionDescriptionId =
+                `file-${file.fileObjectId}-locked-extension`;
               return (
                 <article
                   key={`${file.kind}-${file.id}`}
@@ -416,11 +418,25 @@ function ItemSheetContent({
                           defaultValue={fileNameParts.baseName}
                           autoFocus
                           disabled={pending}
-                          aria-label={`Rename ${file.filename}`}
+                          aria-label={`Rename ${file.filename} base name`}
+                          aria-describedby={
+                            fileNameParts.extension
+                              ? extensionDescriptionId
+                              : undefined
+                          }
                         />
                         {fileNameParts.extension ? (
-                          <span className="file-rename-extension">
-                            {fileNameParts.extension}
+                          <span
+                            id={extensionDescriptionId}
+                            className="file-rename-extension"
+                            title={`Locked extension ${fileNameParts.extension}`}
+                          >
+                            <span aria-hidden="true">
+                              {fileNameParts.extension}
+                            </span>
+                            <span className="sr-only">
+                              Locked extension: {fileNameParts.extension}
+                            </span>
                           </span>
                         ) : null}
                       </label>
@@ -458,6 +474,7 @@ function ItemSheetContent({
                             className="button button-secondary"
                             type="button"
                             disabled={pending}
+                            aria-label={`Rename ${file.filename}`}
                             onClick={() => {
                               setLocalError("");
                               setRenamingFileId(file.fileObjectId);

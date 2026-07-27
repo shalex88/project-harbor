@@ -98,6 +98,18 @@ test("renaming sends only the base name and returns the refreshed snapshot", asy
   });
 });
 
+test("rename gateway failures use a rename-specific fallback", async () => {
+  await assert.rejects(
+    () =>
+      renameUploadedFile({
+        fileObjectId: "file-1",
+        baseName: "Quarterly plan",
+        request: async () => new Response("Bad gateway", { status: 502 }),
+      }),
+    /could not be renamed/i,
+  );
+});
+
 test("a failed chunk prevents completion and cancels the session", async () => {
   const calls = [];
   let chunk = 0;

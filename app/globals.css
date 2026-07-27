@@ -1935,9 +1935,11 @@ strong.work-item-title {
 
 .file-rename-extension {
   flex: 0 0 auto;
+  max-width: 45%;
   border-left: 1px solid var(--border);
   color: var(--text-muted);
   padding: 0 10px;
+  word-break: break-all;
 }
 
 .payments-panel {

@@ -14,7 +14,9 @@
 - Only the base name is editable; the current extension is visibly locked.
 - The server reloads and preserves the stored extension rather than trusting the client.
 - The last non-empty suffix is the extension; `.env`, `README`, and `report.` are extensionless.
-- Base names are trimmed, required, and reject control characters, `/`, and `\`.
+- Extensionless files cannot acquire a final non-empty suffix during rename.
+- Base names are trimmed, required, and reject C0/C1 controls, bidirectional formatting controls, `/`, and `\`.
+- Uploads and renames share executable-suffix validation, including leading-dot and trailing-dot Windows-normalized forms.
 - Combined filenames remain at most 160 characters.
 - Duplicate filenames remain allowed.
 - Renaming changes only `file_objects.filename`; bytes, R2 keys, relationships, MIME type, size, attribution, and timestamps remain unchanged.
@@ -91,6 +93,10 @@ test("renaming trims the base and preserves the exact stored extension", () => {
     renamedFilename("archive.tar.GZ", "  final.archive  "),
     "final.archive.GZ",
   );
+  assert.equal(
+    renamedFilename("report.pdf", "archive.exe"),
+    "archive.exe.pdf",
+  );
   assert.equal(renamedFilename("README", " Release notes "), "Release notes");
   assert.equal(renamedFilename(".env", "production"), "production");
 });
@@ -99,6 +105,11 @@ test("renaming rejects empty, unsafe, and overlong final names", () => {
   assert.throws(() => renamedFilename("report.pdf", "   "), /required/i);
   assert.throws(() => renamedFilename("report.pdf", "../secret"), /unsafe/i);
   assert.throws(() => renamedFilename("report.pdf", "bad\u0000name"), /unsafe/i);
+  assert.throws(() => renamedFilename("report.pdf", "bad\u0085name"), /unsafe/i);
+  assert.throws(
+    () => renamedFilename("README", "run.exe"),
+    /extension cannot be changed/i,
+  );
   assert.throws(
     () => renamedFilename("report.pdf", "x".repeat(157)),
     /160 characters or less/i,
@@ -129,7 +140,8 @@ Create `lib/file-renaming.ts`:
 import { DomainError } from "./domain.ts";
 
 const MAX_FILENAME_LENGTH = 160;
-const UNSAFE_BASE_NAME = /[\/\\\u0000-\u001f\u007f]/;
+const UNSAFE_BASE_NAME =
+  /[\/\\\u0000-\u001f\u007f-\u009f\u061c\u200e-\u200f\u202a-\u202e\u2066-\u2069]/;
 
 type RenameInput = { baseName: string };
 
@@ -170,6 +182,9 @@ export function renamedFilename(
     throw new DomainError("File name contains unsafe characters");
   }
   const { extension } = splitFilename(currentFilename);
+  if (!extension && splitFilename(baseName).extension) {
+    throw new DomainError("File extension cannot be changed");
+  }
   const filename = `${baseName}${extension}`;
   if (filename.length > MAX_FILENAME_LENGTH) {
     throw new DomainError("File name must be 160 characters or less");
@@ -869,7 +884,7 @@ git commit -m "feat: rename uploaded files inline"
 - Consumes: the complete filename, API, repository, and inline editor behavior from Tasks 1–3.
 - Produces: verified desktop/mobile behavior and a branch ready for review.
 
-- [ ] **Step 1: Run all automated checks**
+- [x] **Step 1: Run all automated checks**
 
 Run:
 
@@ -884,7 +899,7 @@ Expected: production build succeeds, every Node test passes, ESLint reports no
 errors or warnings, artifact validation passes, and Git reports no whitespace
 errors.
 
-- [ ] **Step 2: Exercise the full rename flow in the development app**
+- [x] **Step 2: Exercise the full rename flow in the development app**
 
 Start the app with `npm run dev`. In a browser:
 
@@ -901,7 +916,7 @@ Start the app with `npm run dev`. In a browser:
 7. Repeat Rename on a receipt owned by the current user and confirm its
    extension is also locked.
 
-- [ ] **Step 3: Inspect responsive layouts**
+- [x] **Step 3: Inspect responsive layouts**
 
 At a desktop viewport around 1440×900 and a mobile viewport around 390×844,
 inspect:
@@ -916,7 +931,7 @@ Expected: the locked extension remains visible, inputs and buttons do not
 overflow, mobile actions meet the existing 44px touch-target convention, and
 the Files sheet remains usable without horizontal scrolling.
 
-- [ ] **Step 4: Review and commit verification fixes**
+- [x] **Step 4: Review and commit verification fixes**
 
 Review `git diff origin/main...HEAD` for unrelated changes and sensitive data.
 If visual or automated verification required fixes, rerun the affected focused

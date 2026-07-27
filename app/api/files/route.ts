@@ -4,7 +4,7 @@ import {
   readUploadChunk,
 } from "@/lib/chunked-upload";
 import { DomainError } from "@/lib/domain";
-import { parseFileRenameInput } from "@/lib/file-renaming";
+import { createFileRenameHandler } from "@/lib/file-rename-handler";
 import { errorResponse } from "@/lib/http";
 import { createFileUploadService } from "@/lib/file-upload-service";
 import {
@@ -40,6 +40,12 @@ const fileUploadService = createFileUploadService({
   loadSnapshot: loadWorkspaceSnapshot,
   randomUUID: () => crypto.randomUUID(),
   now: () => new Date(),
+});
+
+const renameFileHandler = createFileRenameHandler({
+  requireUser: requireAppUser,
+  renameFile: renameFileMetadata,
+  handleError: errorResponse,
 });
 
 export async function GET(request: Request) {
@@ -102,24 +108,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  try {
-    const identity = await requireAppUser();
-    const fileId = new URL(request.url).searchParams.get("id");
-    if (!fileId) throw new DomainError("File is required");
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      throw new DomainError("Request body must be valid JSON");
-    }
-    const { baseName } = parseFileRenameInput(body);
-    return Response.json(
-      await renameFileMetadata(identity, fileId, baseName),
-      { headers: { "Cache-Control": "private, no-store" } },
-    );
-  } catch (error) {
-    return errorResponse(error);
-  }
+  return renameFileHandler(request);
 }
 
 export async function DELETE(request: Request) {

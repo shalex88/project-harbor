@@ -29,6 +29,7 @@ import {
 } from "./domain";
 import { canManagePayment, normalizeEmail } from "./authorization";
 import type { IdentityUser } from "./auth";
+import { FILE_RENAME_UPDATE_SQL } from "./file-rename-persistence";
 import { createFileRenameService } from "./file-rename-service";
 import {
   DIRECTED_RELATION_INSERT_SQL,
@@ -1419,11 +1420,7 @@ export async function renameFileMetadata(
     requireProjectAccess,
     getPaymentContext: paymentContext,
     updateFilename: async (targetFileId, filename) => {
-      await run(
-        "UPDATE file_objects SET filename = ? WHERE id = ?",
-        filename,
-        targetFileId,
-      );
+      await run(FILE_RENAME_UPDATE_SQL, filename, targetFileId);
     },
     loadSnapshot: loadWorkspaceSnapshot,
   }).rename(identity, fileId, baseName);

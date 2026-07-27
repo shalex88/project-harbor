@@ -41,12 +41,18 @@ The extension is preserved exactly, including its original case. The editor
 accepts only a new base name. The server reloads the current stored filename,
 derives its extension, and combines that locked extension with the submitted
 base name; it never accepts a replacement extension from the client.
+An extensionless file must remain extensionless: a requested base name that
+would introduce a final non-empty suffix is rejected.
 
-The base name is trimmed and must remain non-empty. Control characters, `/`,
-and `\` are rejected. Unicode, spaces, punctuation, and additional dots are
-allowed. The combined stored filename must be no more than 160 characters,
-matching the existing upload filename limit. Duplicate filenames are allowed
-because file identity remains the file-object ID.
+The base name is trimmed and must remain non-empty. C0/C1 control characters,
+bidirectional formatting controls, `/`, and `\` are rejected. Unicode, spaces,
+punctuation, and additional dots are allowed when an existing extension
+remains locked. The combined stored filename must be no more than 160
+characters, matching the existing upload filename limit. Duplicate filenames
+are allowed because file identity remains the file-object ID.
+The final constructed name also passes the existing executable-suffix policy.
+That check ignores trailing dots and spaces so Windows-normalized forms such as
+`.exe` and `run.exe.` cannot be introduced through a rename.
 
 ## Data flow and API
 
@@ -86,7 +92,9 @@ Tests prove that:
 - filename splitting handles ordinary, multi-dot, extensionless, dotfile, and
   trailing-dot names;
 - renaming trims valid base names, preserves the exact extension, rejects
-  empty and unsafe names, and enforces the 160-character combined limit;
+  empty and unsafe names, prevents extensionless files from acquiring a suffix,
+  rejects executable names including Windows-normalized forms, and enforces the
+  160-character combined limit;
 - the PATCH route requires an ID and strict `baseName` JSON input;
 - repository renames update only filename metadata, permit project members to
   rename attachments, and enforce existing receipt-management permissions;
