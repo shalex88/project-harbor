@@ -2531,12 +2531,14 @@ strong.work-item-title {
   }
 
   .calendar-grid {
+    width: 100%;
     overflow-x: auto;
-    min-width: 700px;
+    min-width: 0;
+    grid-template-columns: repeat(7, minmax(100px, 1fr));
   }
 
   .calendar-week {
-    min-width: 760px;
+    grid-template-columns: repeat(7, minmax(108px, 1fr));
   }
 
   .table-scroll {
