@@ -1,4 +1,5 @@
 import { DomainError } from "./domain.ts";
+import { MAX_UPLOAD_BYTES } from "./chunked-upload.ts";
 
 type FileDescriptor = { name: string; type: string; size: number };
 export type UploadKind = "item" | "receipt";
@@ -48,13 +49,8 @@ export function validateUpload(
   if (!Number.isSafeInteger(file.size) || file.size <= 0) {
     throw new DomainError("Choose a non-empty file");
   }
-  const max = kind === "receipt" ? 10 * 1024 * 1024 : 25 * 1024 * 1024;
-  if (file.size > max) {
-    throw new DomainError(
-      kind === "receipt"
-        ? "Receipts must be 10 MB or smaller"
-        : "Files must be 25 MB or smaller",
-    );
+  if (file.size > MAX_UPLOAD_BYTES) {
+    throw new DomainError("Files must be 5 MB or smaller");
   }
   const extension = filename.includes(".")
     ? filename.split(".").at(-1)?.toLowerCase() ?? ""

@@ -167,11 +167,11 @@ test("upload policy rejects executables and oversized item files", () => {
         },
         "item",
       ),
-    /25 MB/,
+    /5 MB/,
   );
 });
 
-test("receipt policy accepts images and PDFs up to 10 MB", () => {
+test("receipt policy accepts images and PDFs", () => {
   assert.deepEqual(
     validateUpload(
       { name: "receipt.pdf", type: "application/pdf", size: 124_000 },
@@ -191,4 +191,26 @@ test("receipt policy accepts images and PDFs up to 10 MB", () => {
       ),
     /image or PDF/,
   );
+});
+
+test("all uploads use one 5 MiB maximum", () => {
+  const maximum = 5 * 1024 * 1024;
+  for (const [kind, type] of [
+    ["item", "application/pdf"],
+    ["receipt", "application/pdf"],
+  ]) {
+    assert.equal(
+      validateUpload({ name: "document.pdf", type, size: maximum }, kind)
+        .sizeBytes,
+      maximum,
+    );
+    assert.throws(
+      () =>
+        validateUpload(
+          { name: "document.pdf", type, size: maximum + 1 },
+          kind,
+        ),
+      /5 MB/,
+    );
+  }
 });
