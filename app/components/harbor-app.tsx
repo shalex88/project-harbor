@@ -13,6 +13,7 @@ import type {
   WorkspaceMutationResult,
   WorkspaceSnapshot,
 } from "@/lib/domain";
+import { uploadFileInChunks } from "@/lib/upload-client";
 import { AppShell, type AppRoute } from "./app-shell";
 import {
   EventsDashboard,
@@ -220,45 +221,10 @@ export function HarborApp({
   ) => {
     setPending(true);
     try {
-      const query = target.itemId
-        ? `itemId=${encodeURIComponent(target.itemId)}`
-        : `paymentId=${encodeURIComponent(target.paymentId ?? "")}`;
-      const body = new FormData();
-      body.set("file", file);
-      const next = await new Promise<WorkspaceSnapshot>((resolve, reject) => {
-        const request = new XMLHttpRequest();
-        request.open("POST", `/api/files?${query}`);
-        request.upload.addEventListener("progress", (event) => {
-          if (event.lengthComputable) {
-            setUploadProgress(Math.round((event.loaded / event.total) * 100));
-          }
-        });
-        request.addEventListener("load", () => {
-          let data: WorkspaceSnapshot | { error?: string };
-          try {
-            data = JSON.parse(request.responseText) as
-              | WorkspaceSnapshot
-              | { error?: string };
-          } catch {
-            reject(new Error("The upload returned an invalid response"));
-            return;
-          }
-          if (request.status < 200 || request.status >= 300) {
-            reject(
-              new Error(
-                "error" in data && data.error ? data.error : "Upload failed",
-              ),
-            );
-            return;
-          }
-          setUploadProgress(100);
-          resolve(data as WorkspaceSnapshot);
-        });
-        request.addEventListener("error", () =>
-          reject(new Error("The upload could not reach Project Harbor")),
-        );
-        setUploadProgress(0);
-        request.send(body);
+      const next = await uploadFileInChunks({
+        target,
+        file,
+        onProgress: setUploadProgress,
       });
       acceptSnapshot(next);
       pushToast(target.paymentId ? "Receipt uploaded" : "File uploaded");
