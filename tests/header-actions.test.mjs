@@ -104,14 +104,25 @@ test("timeline task and event actions use the same primary button design", () =>
     "header actions must render before the workspace main content",
   );
   const header = html.slice(headerStart, headerEnd);
-  const actionClasses = [
+  const actions = [
     ...header.matchAll(
-      /<button class="([^"]+)" type="button">\+ (?:New task|New event)<\/button>/g,
+      /<button class="([^"]+)" type="button">\+ (New task|New event)<\/button>/g,
     ),
-  ].map((match) => match[1]);
+  ].map((match) => ({
+    label: match[2],
+    classes: [...new Set(match[1].split(/\s+/).filter(Boolean))].sort(),
+  }));
 
-  assert.deepEqual(actionClasses, [
-    "button button-primary",
-    "button button-primary",
-  ]);
+  assert.equal(actions.length, 2, "Timeline must render two header actions");
+  assert.deepEqual(
+    actions.map((action) => action.label),
+    ["New task", "New event"],
+  );
+  assert.deepEqual(actions[0].classes, actions[1].classes);
+  for (const action of actions) {
+    assert.ok(
+      action.classes.includes("button-primary"),
+      `${action.label} must use primary button styling`,
+    );
+  }
 });
