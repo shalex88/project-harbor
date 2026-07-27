@@ -2,9 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import test from "node:test";
 
-const headerActionsModule = await import(
-  "../app/components/header-actions.ts"
-).catch(() => ({}));
+const headerActionsModule = await import("../app/components/header-actions.ts");
 const { headerActionsForRoute } = headerActionsModule;
 
 test("timeline offers task creation before event creation", () => {
@@ -89,10 +87,23 @@ test("timeline task and event actions use the same primary button design", () =>
       encoding: "utf8",
     },
   );
-  const header = html.slice(
-    html.indexOf('<div class="header-actions">'),
-    html.indexOf('<main class="workspace-main">'),
+  const headerStart = html.indexOf('<div class="header-actions">');
+  const headerEnd = html.indexOf('<main class="workspace-main">');
+  assert.notEqual(
+    headerStart,
+    -1,
+    "rendered shell must include the header actions container",
   );
+  assert.notEqual(
+    headerEnd,
+    -1,
+    "rendered shell must include the workspace main marker",
+  );
+  assert.ok(
+    headerStart < headerEnd,
+    "header actions must render before the workspace main content",
+  );
+  const header = html.slice(headerStart, headerEnd);
   const actionClasses = [
     ...header.matchAll(
       /<button class="([^"]+)" type="button">\+ (?:New task|New event)<\/button>/g,
