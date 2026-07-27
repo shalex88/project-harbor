@@ -17,6 +17,14 @@ export type UploadSessionManifest = {
   createdAt: string;
 };
 
+export type UploadInitiation = {
+  itemId?: string;
+  paymentId?: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+};
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -34,6 +42,35 @@ function requiredText(value: unknown, maximum = 320): string {
 function nullableText(value: unknown): string | null {
   if (value === null) return null;
   return requiredText(value);
+}
+
+export function parseUploadInitiation(input: unknown): UploadInitiation {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    throw new DomainError("Upload details are invalid");
+  }
+  const value = input as Record<string, unknown>;
+  if (
+    (value.itemId !== undefined &&
+      (typeof value.itemId !== "string" || value.itemId.length === 0)) ||
+    (value.paymentId !== undefined &&
+      (typeof value.paymentId !== "string" || value.paymentId.length === 0)) ||
+    typeof value.filename !== "string" ||
+    typeof value.contentType !== "string" ||
+    typeof value.sizeBytes !== "number"
+  ) {
+    throw new DomainError("Upload details are invalid");
+  }
+  return {
+    ...(value.itemId !== undefined
+      ? { itemId: value.itemId as string }
+      : {}),
+    ...(value.paymentId !== undefined
+      ? { paymentId: value.paymentId as string }
+      : {}),
+    filename: value.filename,
+    contentType: value.contentType,
+    sizeBytes: value.sizeBytes,
+  };
 }
 
 export function expectedChunkCount(sizeBytes: number): number {

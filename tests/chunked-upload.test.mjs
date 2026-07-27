@@ -7,6 +7,7 @@ import {
   assembleUploadChunks,
   expectedChunkCount,
   expectedChunkSize,
+  parseUploadInitiation,
   parseUploadSessionManifest,
   readUploadChunk,
   uploadChunkKey,
@@ -26,6 +27,30 @@ const manifest = {
   chunkCount: 2,
   createdAt: "2026-07-27T12:00:00.000Z",
 };
+
+test("rejects explicitly empty upload target identifiers", () => {
+  for (const input of [
+    {
+      itemId: "",
+      paymentId: "payment-1",
+      filename: "receipt.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 1,
+    },
+    {
+      itemId: "item-1",
+      paymentId: "",
+      filename: "plans.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 1,
+    },
+  ]) {
+    assert.throws(
+      () => parseUploadInitiation(input),
+      /Upload details are invalid/,
+    );
+  }
+});
 
 test("calculates exact chunk counts and sizes", () => {
   assert.equal(MAX_UPLOAD_BYTES, 5 * 1024 * 1024);

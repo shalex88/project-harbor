@@ -1,5 +1,8 @@
 import { requireAppUser } from "@/lib/auth";
-import { readUploadChunk } from "@/lib/chunked-upload";
+import {
+  parseUploadInitiation,
+  readUploadChunk,
+} from "@/lib/chunked-upload";
 import { DomainError } from "@/lib/domain";
 import { errorResponse } from "@/lib/http";
 import { createFileUploadService } from "@/lib/file-upload-service";
@@ -61,30 +64,11 @@ export async function POST(request: Request) {
     const url = new URL(request.url);
     const stage = url.searchParams.get("stage");
     if (stage === "init") {
-      const body = (await request.json()) as {
-        itemId?: unknown;
-        paymentId?: unknown;
-        filename?: unknown;
-        contentType?: unknown;
-        sizeBytes?: unknown;
-      };
-      if (
-        (body.itemId !== undefined && typeof body.itemId !== "string") ||
-        (body.paymentId !== undefined && typeof body.paymentId !== "string") ||
-        typeof body.filename !== "string" ||
-        typeof body.contentType !== "string" ||
-        typeof body.sizeBytes !== "number"
-      ) {
-        throw new DomainError("Upload details are invalid");
-      }
       return Response.json(
-        await fileUploadService.initiate(identity, {
-          ...(body.itemId ? { itemId: body.itemId } : {}),
-          ...(body.paymentId ? { paymentId: body.paymentId } : {}),
-          filename: body.filename,
-          contentType: body.contentType,
-          sizeBytes: body.sizeBytes,
-        }),
+        await fileUploadService.initiate(
+          identity,
+          parseUploadInitiation(await request.json()),
+        ),
         { status: 201 },
       );
     }
