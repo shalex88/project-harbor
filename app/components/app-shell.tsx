@@ -54,7 +54,8 @@ export function AppShell({
   route,
   activeProjectId,
   title,
-  actionLabel,
+  primaryAction,
+  secondaryAction,
   children,
   onRouteChange,
   onProjectSelect,
@@ -63,14 +64,20 @@ export function AppShell({
   onProjectDelete,
   exportingProjectId,
   projectMutationPending,
-  onPrimaryAction,
 }: {
   user: AppUser;
   projects: ProjectRecord[];
   route: AppRoute;
   activeProjectId: string | null;
   title: string;
-  actionLabel: string;
+  primaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
   children: ReactNode;
   onRouteChange: (route: AppRoute) => void;
   onProjectSelect: (projectId: string) => void;
@@ -79,7 +86,6 @@ export function AppShell({
   onProjectDelete: (projectId: string) => Promise<void>;
   exportingProjectId: string | null;
   projectMutationPending: boolean;
-  onPrimaryAction: () => void;
 }) {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
   const [projectAction, setProjectAction] =
@@ -207,9 +213,11 @@ export function AppShell({
             <span aria-hidden="true">⚓</span>
             Harbor
           </button>
-          <button className="button button-primary mobile-create" type="button" onClick={onPrimaryAction}>
-            + Create
-          </button>
+          {primaryAction ? (
+            <button className="button button-primary mobile-create" type="button" onClick={primaryAction.onClick}>
+              + Create
+            </button>
+          ) : null}
         </header>
         <header className="workspace-header">
           <div>
@@ -217,9 +225,16 @@ export function AppShell({
             <h1>{title}</h1>
           </div>
           <div className="header-actions">
-            <button className="button button-primary" type="button" onClick={onPrimaryAction}>
-              + {actionLabel}
-            </button>
+            {secondaryAction ? (
+              <button className="button button-primary" type="button" onClick={secondaryAction.onClick}>
+                + {secondaryAction.label}
+              </button>
+            ) : null}
+            {primaryAction ? (
+              <button className="button button-primary" type="button" onClick={primaryAction.onClick}>
+                + {primaryAction.label}
+              </button>
+            ) : null}
           </div>
         </header>
         <main className="workspace-main">{children}</main>
