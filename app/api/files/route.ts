@@ -1,6 +1,7 @@
 import { requireAppUser } from "@/lib/auth";
 import { DomainError } from "@/lib/domain";
 import { errorResponse } from "@/lib/http";
+import { createFileUploadService } from "@/lib/file-upload-service";
 import {
   authorizeFileTarget,
   createFileMetadata,
@@ -15,11 +16,24 @@ import {
   deleteObjectsBestEffort,
   downloadHeaders,
   getObject,
-  putObject,
+  listObjectKeys,
+  putObjectBytes,
+  readObjectBytes,
 } from "@/lib/storage";
-import { validateUpload } from "@/lib/upload-policy";
 
 export const dynamic = "force-dynamic";
+
+const fileUploadService = createFileUploadService({
+  authorizeTarget: authorizeFileTarget,
+  putBytes: putObjectBytes,
+  readBytes: readObjectBytes,
+  listObjectKeys,
+  deleteObjectsBestEffort,
+  createMetadata: createFileMetadata,
+  loadSnapshot: loadWorkspaceSnapshot,
+  randomUUID: () => crypto.randomUUID(),
+  now: () => new Date(),
+});
 
 export async function GET(request: Request) {
   try {
@@ -40,40 +54,61 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  let uploadedKey: string | null = null;
   try {
     const identity = await requireAppUser();
     const url = new URL(request.url);
-    const itemId = url.searchParams.get("itemId") ?? undefined;
-    const paymentId = url.searchParams.get("paymentId") ?? undefined;
-    if (Boolean(itemId) === Boolean(paymentId)) {
-      throw new DomainError("Choose exactly one item or payment target");
+    const stage = url.searchParams.get("stage");
+    if (stage === "init") {
+      const body = (await request.json()) as {
+        itemId?: unknown;
+        paymentId?: unknown;
+        filename?: unknown;
+        contentType?: unknown;
+        sizeBytes?: unknown;
+      };
+      if (
+        (body.itemId !== undefined && typeof body.itemId !== "string") ||
+        (body.paymentId !== undefined && typeof body.paymentId !== "string") ||
+        typeof body.filename !== "string" ||
+        typeof body.contentType !== "string" ||
+        typeof body.sizeBytes !== "number"
+      ) {
+        throw new DomainError("Upload details are invalid");
+      }
+      return Response.json(
+        await fileUploadService.initiate(identity, {
+          ...(body.itemId ? { itemId: body.itemId } : {}),
+          ...(body.paymentId ? { paymentId: body.paymentId } : {}),
+          filename: body.filename,
+          contentType: body.contentType,
+          sizeBytes: body.sizeBytes,
+        }),
+        { status: 201 },
+      );
     }
-    const target = await authorizeFileTarget(identity, { itemId, paymentId });
-    const form = await request.formData();
-    const file = form.get("file");
-    if (!(file instanceof File)) throw new DomainError("Choose a file");
-    const policy = validateUpload(file, paymentId ? "receipt" : "item");
-    const fileId = crypto.randomUUID();
-    uploadedKey = `projects/${target.projectId}/${fileId}`;
-    await putObject(uploadedKey, file, policy.contentType);
-    const { replacedR2Key } = await createFileMetadata({
-      identity,
-      itemId,
-      paymentId,
-      fileId,
-      r2Key: uploadedKey,
-      filename: policy.filename,
-      contentType: policy.contentType,
-      sizeBytes: policy.sizeBytes,
-    });
-    uploadedKey = null;
-    if (replacedR2Key) {
-      await deleteObjectsBestEffort([replacedR2Key]);
+    const uploadId = url.searchParams.get("uploadId");
+    if (!uploadId) throw new DomainError("Upload is required");
+    if (stage === "chunk") {
+      const rawIndex = url.searchParams.get("index");
+      if (!rawIndex || !/^(0|[1-9]\d*)$/.test(rawIndex)) {
+        throw new DomainError("Upload chunk index is invalid");
+      }
+      await fileUploadService.storeChunk(
+        identity,
+        uploadId,
+        Number(rawIndex),
+        new Uint8Array(await request.arrayBuffer()),
+      );
+      return Response.json({ ok: true });
     }
-    return Response.json(await loadWorkspaceSnapshot(identity), { status: 201 });
+    if (stage === "complete") {
+      return Response.json(
+        await fileUploadService.complete(identity, uploadId),
+        { status: 201 },
+      );
+    }
+    throw new DomainError("Upload stage is invalid");
   } catch (error) {
-    if (uploadedKey) await deleteObjectsBestEffort([uploadedKey]);
     return errorResponse(error);
   }
 }
@@ -101,7 +136,13 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const identity = await requireAppUser();
-    const fileId = new URL(request.url).searchParams.get("id");
+    const url = new URL(request.url);
+    const uploadId = url.searchParams.get("uploadId");
+    if (uploadId) {
+      await fileUploadService.cancel(identity, uploadId);
+      return Response.json({ ok: true });
+    }
+    const fileId = url.searchParams.get("id");
     if (!fileId) throw new DomainError("File is required");
     const { r2Key } = await deleteFileMetadata(identity, fileId);
     await deleteObjectsBestEffort([r2Key]);
