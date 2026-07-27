@@ -8,6 +8,10 @@ const titleSource = await readFile(
   "utf8",
 );
 const css = await readFile(new URL("app/globals.css", root), "utf8");
+const itemSheet = await readFile(
+  new URL("app/components/item-sheet.tsx", root),
+  "utf8",
+);
 
 test("attachment title layout keeps the icon physically left and the text direction automatic", () => {
   assert.match(titleSource, /className="work-item-title-text" dir="auto"/);
@@ -20,4 +24,9 @@ test("attachment title layout keeps the icon physically left and the text direct
     css,
     /\.calendar-item \.work-item-title-text[\s\S]*?white-space:\s*normal/,
   );
+});
+
+test("the attachment picker advertises the actual 5 MB maximum", () => {
+  assert.match(itemSheet, /up to 5 MB/);
+  assert.doesNotMatch(itemSheet, /up to 25 MB/);
 });

@@ -1,6 +1,7 @@
 import { getPlatformEnv } from "./platform-env";
 import {
   parseUploadSessionManifest,
+  uploadClaimKey,
   uploadChunkKey,
   uploadManifestKey,
   type UploadSessionManifest,
@@ -32,6 +33,21 @@ export async function putObjectBytes(
   await bucket().put(key, bytes, {
     httpMetadata: { contentType },
   });
+}
+
+export async function claimUpload(
+  uploadId: string,
+  createdAt: string,
+): Promise<boolean> {
+  const result = await bucket().put(
+    uploadClaimKey(uploadId),
+    new TextEncoder().encode(createdAt),
+    {
+      httpMetadata: { contentType: "text/plain" },
+      onlyIf: { etagDoesNotMatch: "*" },
+    },
+  );
+  return result !== null;
 }
 
 export async function getObject(key: string): Promise<R2ObjectBody | null> {

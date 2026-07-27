@@ -11,7 +11,7 @@ import {
   type RelationType,
   type TaskStatus,
 } from "./domain.ts";
-import { validateUpload } from "./upload-policy.ts";
+import { validateArchiveUpload } from "./upload-policy.ts";
 
 export const PROJECT_ARCHIVE_FORMAT = "project-harbor-project" as const;
 export const PROJECT_ARCHIVE_VERSION = 1 as const;
@@ -348,7 +348,7 @@ function parseAttachment(input: unknown): ProjectArchiveAttachment {
   ]);
   const id = archiveId(value.id, "Attachment id");
   const sizeBytes = positiveInteger(value.sizeBytes, "Attachment size");
-  const policy = validateUpload(
+  const policy = validateArchiveUpload(
     {
       name: requireText(value.filename, "Attachment filename", 160),
       type: requireText(value.contentType, "Attachment content type", 160),
@@ -389,7 +389,7 @@ function parseReceipt(input: unknown): ProjectArchiveReceipt {
   ]);
   const id = archiveId(value.id, "Receipt id");
   const sizeBytes = positiveInteger(value.sizeBytes, "Receipt size");
-  const policy = validateUpload(
+  const policy = validateArchiveUpload(
     {
       name: requireText(value.filename, "Receipt filename", 160),
       type: requireText(value.contentType, "Receipt content type", 160),
@@ -635,7 +635,7 @@ export async function validateArchivePayloads(
       throw new DomainError("An archived file failed its integrity check");
     }
     const kind = "paymentId" in declaration ? "receipt" : "item";
-    validateUpload(
+    validateArchiveUpload(
       {
         name: declaration.filename,
         type: declaration.contentType,

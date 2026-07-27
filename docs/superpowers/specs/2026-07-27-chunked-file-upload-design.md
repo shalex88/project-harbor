@@ -24,7 +24,8 @@ but those limits cannot be reached through the deployed request path.
 - Return useful JSON errors for failures produced inside Project Harbor.
 
 Project export/import archives are outside this transport change. Their
-existing archive limits and raw ZIP routes remain unchanged.
+existing 25 MiB attachment and 10 MiB receipt limits and raw ZIP routes remain
+unchanged through a separate archive-validation policy.
 
 ## Architecture
 
@@ -84,6 +85,12 @@ Completion repeats authentication and target authorization, then reads every
 expected chunk in order. It rejects missing, duplicated, incorrectly sized, or
 over-total chunks.
 
+Before reading chunks, completion conditionally creates
+`_upload-claims/<uploadId>.txt` with R2's `If-None-Match: *` equivalent. Only
+the request that creates this claim may continue, so retries or concurrent
+completion requests cannot create duplicate file metadata. Claims remain until
+bounded stale cleanup removes them after 24 hours.
+
 Because the complete file is capped at 5 MiB, the route may safely assemble it
 into one `Uint8Array` within the Worker's memory limit. It writes that byte
 array to the existing final R2 key, creates the existing D1 file metadata, and
@@ -107,6 +114,10 @@ list only `_upload-manifests/` and never spend its bounded page on chunk
 objects. It examines only one limited manifest page per initiation so it cannot
 turn one user upload into an unbounded storage scan. This covers browser
 closure and lost-network cases where explicit cancellation never arrives.
+
+Every manifest-based operation also rejects sessions at least 24 hours old and
+cleans their temporary objects. Opportunistic cleanup is not the enforcement
+boundary for expiration.
 
 ## Client behavior
 

@@ -30,8 +30,11 @@ interface R2Bucket {
   put(
     key: string,
     value: unknown,
-    options?: { httpMetadata?: { contentType?: string } },
-  ): Promise<unknown>;
+    options?: {
+      httpMetadata?: { contentType?: string };
+      onlyIf?: { etagDoesNotMatch?: string };
+    },
+  ): Promise<unknown | null>;
   get(key: string): Promise<R2ObjectBody | null>;
   delete(key: string): Promise<void>;
   list(options: {

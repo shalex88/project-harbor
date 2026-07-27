@@ -36,6 +36,7 @@ type FileUploadDependencies = {
     limit: number,
     cursor?: string,
   ): Promise<{ keys: string[]; cursor: string | null }>;
+  claimUpload(uploadId: string, createdAt: string): Promise<boolean>;
   deleteObjectsBestEffort(keys: string[]): Promise<void>;
   createMetadata(input: {
     identity: IdentityUser;
@@ -55,6 +56,7 @@ type FileUploadDependencies = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 const MANIFEST_PREFIX = "_upload-manifests/";
+const CLAIM_PREFIX = "_upload-claims/";
 const EXPIRES_AFTER_MS = 24 * 60 * 60 * 1000;
 const CLEANUP_PAGE_SIZE = 50;
 
@@ -85,7 +87,17 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
     const bytes = await dependencies.readBytes(uploadManifestKey(uploadId));
     if (!bytes) return uploadError();
     try {
-      return parseUploadSessionManifest(JSON.parse(decoder.decode(bytes)));
+      const manifest = parseUploadSessionManifest(
+        JSON.parse(decoder.decode(bytes)),
+      );
+      if (
+        dependencies.now().getTime() - Date.parse(manifest.createdAt) >=
+        EXPIRES_AFTER_MS
+      ) {
+        await cleanupManifest(manifest);
+        return uploadError();
+      }
+      return manifest;
     } catch {
       return uploadError();
     }
@@ -125,6 +137,22 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
         EXPIRES_AFTER_MS
       ) {
         await cleanupManifest(manifest);
+      }
+    }
+    const claims = await dependencies.listObjectKeys(
+      CLAIM_PREFIX,
+      CLEANUP_PAGE_SIZE,
+    );
+    for (const key of claims.keys) {
+      const bytes = await dependencies.readBytes(key);
+      if (!bytes) continue;
+      const createdAt = decoder.decode(bytes);
+      if (
+        !Number.isFinite(Date.parse(createdAt)) ||
+        dependencies.now().getTime() - Date.parse(createdAt) >=
+          EXPIRES_AFTER_MS
+      ) {
+        await dependencies.deleteObjectsBestEffort([key]);
       }
     }
   }
@@ -204,6 +232,13 @@ export function createFileUploadService(dependencies: FileUploadDependencies) {
   ): Promise<WorkspaceSnapshot> {
     const manifest = await readManifest(uploadId);
     await authorizeManifest(identity, manifest);
+    const claimed = await dependencies.claimUpload(
+      uploadId,
+      dependencies.now().toISOString(),
+    );
+    if (!claimed) {
+      throw new DomainError("Upload is already being completed", "conflict");
+    }
     let finalKey: string | null = null;
     let metadataCreated = false;
     try {

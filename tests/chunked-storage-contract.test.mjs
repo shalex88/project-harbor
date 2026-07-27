@@ -22,3 +22,9 @@ test("upload cleanup derives manifest and chunk keys from validated metadata", (
   assert.match(source, /uploadChunkKey\(manifest\.uploadId,\s*index\)/);
   assert.match(source, /deleteObjectsBestEffort\(keys\)/);
 });
+
+test("storage can atomically claim an upload only when no claim exists", () => {
+  assert.match(source, /export async function claimUpload/);
+  assert.match(source, /etagDoesNotMatch:\s*"\*"/);
+  assert.match(source, /return result !== null/);
+});

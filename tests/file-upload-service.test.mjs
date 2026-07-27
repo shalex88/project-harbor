@@ -23,6 +23,7 @@ function harness() {
   const events = [];
   let uuidIndex = 0;
   let metadataError = null;
+  const claims = new Set();
   const uuids = [
     "5a6cf3ea-1cee-4e33-9486-80e3f03db343",
     "a455c6df-23ca-4868-bbb9-f31537f4ba78",
@@ -43,6 +44,11 @@ function harness() {
       return objects.get(key) ?? null;
     },
     listObjectKeys: async () => ({ keys: [], cursor: null }),
+    claimUpload: async (uploadId) => {
+      if (claims.has(uploadId)) return false;
+      claims.add(uploadId);
+      return true;
+    },
     deleteObjectsBestEffort: async (keys) => {
       events.push(`delete:${keys.join(",")}`);
       for (const key of keys) objects.delete(key);
@@ -62,6 +68,7 @@ function harness() {
   return {
     dependencies,
     objects,
+    claims,
     events,
     service: createFileUploadService(dependencies),
     failMetadata(error) {
@@ -184,15 +191,64 @@ test("expired cleanup is bounded to manifest listings", async () => {
     uploadManifestKey(uploadId),
     new TextEncoder().encode(JSON.stringify(manifest)),
   );
-  let listing = null;
+  const listings = [];
   const service = createFileUploadService({
     ...h.dependencies,
     listObjectKeys: async (prefix, limit) => {
-      listing = { prefix, limit };
-      return { keys: [uploadManifestKey(uploadId)], cursor: "next-page" };
+      listings.push({ prefix, limit });
+      return {
+        keys:
+          prefix === "_upload-manifests/"
+            ? [uploadManifestKey(uploadId)]
+            : [],
+        cursor: "next-page",
+      };
     },
   });
   await service.cleanupExpired();
-  assert.deepEqual(listing, { prefix: "_upload-manifests/", limit: 50 });
+  assert.deepEqual(listings, [
+    { prefix: "_upload-manifests/", limit: 50 },
+    { prefix: "_upload-claims/", limit: 50 },
+  ]);
   assert.equal(h.objects.has(uploadManifestKey(uploadId)), false);
+});
+
+test("expired sessions cannot accept chunks and are cleaned", async () => {
+  const h = harness();
+  const uploadId = "5a6cf3ea-1cee-4e33-9486-80e3f03db343";
+  const expired = {
+    version: 1,
+    uploadId,
+    identity: owner.email,
+    projectId: "project-1",
+    itemId: "item-1",
+    paymentId: null,
+    filename: "old.pdf",
+    contentType: "application/pdf",
+    sizeBytes: 1,
+    chunkCount: 1,
+    createdAt: "2026-07-25T00:00:00.000Z",
+  };
+  h.objects.set(
+    uploadManifestKey(uploadId),
+    new TextEncoder().encode(JSON.stringify(expired)),
+  );
+  await assert.rejects(
+    () => h.service.storeChunk(owner, uploadId, 0, new Uint8Array([1])),
+    /expired/i,
+  );
+  assert.equal(h.objects.has(uploadManifestKey(uploadId)), false);
+});
+
+test("concurrent completion claims a session and creates metadata once", async () => {
+  const h = harness();
+  const { initiated } = await initiateAndStore(h);
+  const results = await Promise.allSettled([
+    h.service.complete(owner, initiated.uploadId),
+    h.service.complete(owner, initiated.uploadId),
+  ]);
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  assert.equal(h.events.filter((event) => event === "metadata").length, 1);
+  assert.equal(h.claims.size, 1);
 });

@@ -70,6 +70,11 @@ export function uploadChunkKey(uploadId: string, index: number): string {
   return `_upload-parts/${uploadId}/${String(index).padStart(6, "0")}`;
 }
 
+export function uploadClaimKey(uploadId: string): string {
+  if (!UUID_PATTERN.test(uploadId)) invalidManifest();
+  return `_upload-claims/${uploadId}.txt`;
+}
+
 export function parseUploadSessionManifest(
   input: unknown,
 ): UploadSessionManifest {

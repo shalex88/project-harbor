@@ -359,7 +359,7 @@ function ItemSheetContent({
             onDrop={onDrop}
           >
             <strong>Drop a file here</strong>
-            <span>or choose from this device · up to 25 MB</span>
+            <span>or choose from this device · up to 5 MB</span>
             <label className="button button-primary file-picker">Choose file<input type="file" onChange={(event) => void uploadItemFile(event.target.files?.[0])} /></label>
             {uploadProgress !== null ? (
               <div className="upload-progress" role="status" aria-live="polite">

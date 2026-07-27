@@ -14,6 +14,7 @@ import {
 } from "@/lib/repository";
 import {
   deleteObjectsBestEffort,
+  claimUpload,
   downloadHeaders,
   getObject,
   listObjectKeys,
@@ -28,6 +29,7 @@ const fileUploadService = createFileUploadService({
   putBytes: putObjectBytes,
   readBytes: readObjectBytes,
   listObjectKeys,
+  claimUpload,
   deleteObjectsBestEffort,
   createMetadata: createFileMetadata,
   loadSnapshot: loadWorkspaceSnapshot,

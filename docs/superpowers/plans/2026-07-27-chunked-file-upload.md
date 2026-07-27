@@ -15,6 +15,8 @@
 - Every upload stage must authenticate the caller and verify current target access.
 - The final stored object and downloaded bytes must be identical to the selected file.
 - D1 file metadata must be created only after the final R2 object is stored.
+- Concurrent completion requests must be serialized by one conditional R2 upload claim.
+- Sessions at least 24 hours old must be rejected whenever they are used.
 - Temporary and incomplete final objects must be deleted best-effort after success, cancellation, or failure.
 - Existing project archive import/export limits and routes must not change.
 - Downloads must continue to return one file with the original filename and content type.

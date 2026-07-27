@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { parseMutation } from "../lib/mutations.ts";
-import { validateUpload } from "../lib/upload-policy.ts";
+import {
+  validateArchiveUpload,
+  validateUpload,
+} from "../lib/upload-policy.ts";
 
 test("workspace mutation parser rejects unknown actions", () => {
   assert.throws(
@@ -213,4 +216,29 @@ test("all uploads use one 5 MiB maximum", () => {
       /5 MB/,
     );
   }
+});
+
+test("project archives preserve their existing attachment and receipt limits", () => {
+  assert.equal(
+    validateArchiveUpload(
+      {
+        name: "attachment.pdf",
+        type: "application/pdf",
+        size: 25 * 1024 * 1024,
+      },
+      "item",
+    ).sizeBytes,
+    25 * 1024 * 1024,
+  );
+  assert.equal(
+    validateArchiveUpload(
+      {
+        name: "receipt.pdf",
+        type: "application/pdf",
+        size: 10 * 1024 * 1024,
+      },
+      "receipt",
+    ).sizeBytes,
+    10 * 1024 * 1024,
+  );
 });
