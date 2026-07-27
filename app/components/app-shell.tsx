@@ -226,7 +226,7 @@ export function AppShell({
           </div>
           <div className="header-actions">
             {secondaryAction ? (
-              <button className="button" type="button" onClick={secondaryAction.onClick}>
+              <button className="button button-primary" type="button" onClick={secondaryAction.onClick}>
                 + {secondaryAction.label}
               </button>
             ) : null}

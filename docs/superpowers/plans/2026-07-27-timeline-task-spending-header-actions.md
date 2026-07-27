@@ -13,6 +13,7 @@
 - Remove `+ New project` from the Spending workspace header.
 - Remove the generic mobile create action from Spending.
 - Add `+ New task` immediately left of `+ New event` on Timeline.
+- Give both Timeline actions the same primary-button design.
 - Open the existing new-task form from the new Timeline action.
 - Preserve every other route's header actions and creation behavior.
 - Do not add a new modal, mutation, or dashboard-local header.
@@ -176,7 +177,7 @@ Destructure both action props. Render the mobile button only when
 
 ```tsx
 {secondaryAction ? (
-  <button className="button" type="button" onClick={secondaryAction.onClick}>
+  <button className="button button-primary" type="button" onClick={secondaryAction.onClick}>
     + {secondaryAction.label}
   </button>
 ) : null}

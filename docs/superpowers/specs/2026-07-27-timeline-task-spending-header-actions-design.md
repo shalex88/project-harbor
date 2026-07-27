@@ -13,16 +13,17 @@ secondary action. Timeline supplies `New task` as the secondary action and
 retains `New event` as the primary action. Spending supplies no actions.
 
 The desktop header renders the secondary action immediately before the primary
-action. The mobile header continues to expose only the primary action; it is
-hidden when a route has no primary action. Therefore Timeline's existing mobile
-create behavior remains event creation, while Spending no longer shows a mobile
-create button.
+action and gives both actions the same primary-button styling. The mobile header
+continues to expose only the primary action; it is hidden when a route has no
+primary action. Therefore Timeline's existing mobile create behavior remains
+event creation, while Spending no longer shows a mobile create button.
 
 ## Scope
 
 - Remove `+ New project` from the Spending workspace header.
 - Remove the generic mobile create action from Spending.
 - Add `+ New task` immediately left of `+ New event` on Timeline.
+- Give both Timeline actions the same primary-button design.
 - Open the existing new-task form from the new Timeline action.
 - Preserve every other route's header actions and creation behavior.
 - Do not add a new modal, mutation, or dashboard-local header.
