@@ -4,7 +4,7 @@
 
 **Goal:** Remove creation controls from Spending and add task creation immediately before event creation in the Timeline desktop header.
 
-**Architecture:** `HarborApp` continues to select actions by route, while `AppShell` renders optional primary and secondary actions. The primary action remains the sole mobile creation action, preserving Timeline's mobile event-creation behavior while allowing Spending to omit creation entirely.
+**Architecture:** A pure route-action resolver defines primary and secondary creation kinds, `HarborApp` turns those kinds into the existing creation handlers, and `AppShell` renders the resulting optional actions. The primary action remains the sole mobile creation action, preserving Timeline's mobile event-creation behavior while allowing Spending to omit creation entirely.
 
 **Tech Stack:** React 19, TypeScript, Node built-in test runner.
 
@@ -24,66 +24,65 @@
 
 **Files:**
 
+- Create: `app/components/header-actions.ts`
 - Create: `tests/header-actions.test.mjs`
 
 **Interfaces:**
 
-- Consumes: source text from `app/components/app-shell.tsx` and `app/components/harbor-app.tsx`.
-- Produces: regression coverage for optional shared-shell actions, approved desktop ordering, Timeline task/event wiring, and Spending action removal.
+- Consumes: route literals from the existing `AppRoute` union.
+- Produces: `HeaderActionKind`, `HeaderActions`, and `headerActionsForRoute(route)` with regression coverage for Timeline, Spending, and all unchanged routes.
 
-- [ ] **Step 1: Write the failing contract tests**
+- [ ] **Step 1: Write the failing behavior tests**
 
 ```js
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const appShellSource = await readFile(
-  new URL("../app/components/app-shell.tsx", import.meta.url),
-  "utf8",
-);
-const harborAppSource = await readFile(
-  new URL("../app/components/harbor-app.tsx", import.meta.url),
-  "utf8",
-);
+const headerActionsModule = await import(
+  "../app/components/header-actions.ts"
+).catch(() => ({}));
+const { headerActionsForRoute } = headerActionsModule;
 
-test("shared shell renders optional secondary and primary desktop actions in order", () => {
-  assert.match(appShellSource, /actionLabel\?: string;/);
-  assert.match(appShellSource, /secondaryActionLabel\?: string;/);
-  assert.match(appShellSource, /onPrimaryAction\?: \(\) => void;/);
-  assert.match(appShellSource, /onSecondaryAction\?: \(\) => void;/);
-
-  const header = appShellSource.slice(
-    appShellSource.indexOf('<header className="workspace-header">'),
-    appShellSource.indexOf('<main className="workspace-main">'),
+test("timeline offers task creation before event creation", () => {
+  assert.equal(
+    typeof headerActionsForRoute,
+    "function",
+    "headerActionsForRoute must exist",
   );
-  assert.ok(
-    header.indexOf("secondaryActionLabel") < header.indexOf("actionLabel"),
-    "secondary action must render before the primary action",
-  );
-  assert.match(
-    appShellSource,
-    /actionLabel && onPrimaryAction[\s\S]*?className="button button-primary mobile-create"/,
-  );
+  assert.deepEqual(headerActionsForRoute("timeline"), {
+    secondary: "task",
+    primary: "event",
+  });
 });
 
-test("timeline supplies task and event actions while spending supplies none", () => {
-  assert.match(harborAppSource, /const hasPrimaryAction = route !== "spending";/);
-  assert.match(
-    harborAppSource,
-    /secondaryActionLabel=\{route === "timeline" \? "New task" : undefined\}/,
+test("spending offers no creation actions", () => {
+  assert.equal(
+    typeof headerActionsForRoute,
+    "function",
+    "headerActionsForRoute must exist",
   );
-  assert.match(
-    harborAppSource,
-    /onSecondaryAction=\{route === "timeline" \? \(\) => openCreate\("task"\) : undefined\}/,
+  assert.deepEqual(headerActionsForRoute("spending"), {});
+});
+
+test("other routes preserve their existing primary creation action", () => {
+  assert.equal(
+    typeof headerActionsForRoute,
+    "function",
+    "headerActionsForRoute must exist",
   );
-  assert.match(
-    harborAppSource,
-    /actionLabel=\{hasPrimaryAction \? actionLabel : undefined\}/,
-  );
-  assert.match(
-    harborAppSource,
-    /onPrimaryAction=\{hasPrimaryAction \? primaryAction : undefined\}/,
+  assert.deepEqual(
+    Object.fromEntries(
+      ["overview", "tasks", "events", "project"].map((route) => [
+        route,
+        headerActionsForRoute(route),
+      ]),
+    ),
+    {
+      overview: { primary: "project" },
+      tasks: { primary: "task" },
+      events: { primary: "event" },
+      project: { primary: "task" },
+    },
   );
 });
 ```
@@ -96,13 +95,50 @@ Run:
 node --experimental-strip-types --test tests/header-actions.test.mjs
 ```
 
-Expected: FAIL because `AppShell` requires one primary action, exposes no secondary action, and `HarborApp` does not suppress Spending or wire Timeline task creation.
+Expected: FAIL with `headerActionsForRoute must exist` because the route-action resolver has not been created.
 
-- [ ] **Step 3: Commit the failing contract**
+- [ ] **Step 3: Implement the pure route-action resolver**
+
+Create `app/components/header-actions.ts`:
+
+```ts
+import type { AppRoute } from "./app-shell";
+
+export type HeaderActionKind = "project" | "task" | "event";
+
+export type HeaderActions = {
+  primary?: HeaderActionKind;
+  secondary?: HeaderActionKind;
+};
+
+export function headerActionsForRoute(route: AppRoute): HeaderActions {
+  if (route === "spending") return {};
+  if (route === "timeline") {
+    return { secondary: "task", primary: "event" };
+  }
+  if (route === "tasks" || route === "project") {
+    return { primary: "task" };
+  }
+  if (route === "events") return { primary: "event" };
+  return { primary: "project" };
+}
+```
+
+- [ ] **Step 4: Run the focused test to verify it passes**
+
+Run:
 
 ```bash
-git add tests/header-actions.test.mjs
-git commit -m "Test dashboard header actions"
+node --experimental-strip-types --test tests/header-actions.test.mjs
+```
+
+Expected: PASS with three tests and zero failures.
+
+- [ ] **Step 5: Commit the resolver and its contract**
+
+```bash
+git add app/components/header-actions.ts tests/header-actions.test.mjs
+git commit -m "Add dashboard header action rules"
 ```
 
 ### Task 2: Render the approved Timeline and Spending actions
@@ -117,51 +153,82 @@ git commit -m "Test dashboard header actions"
 
 **Interfaces:**
 
-- Consumes: `openCreate(type: "task" | "event")`, the existing `primaryAction`, and optional `actionLabel`, `secondaryActionLabel`, `onPrimaryAction`, and `onSecondaryAction` props.
-- Produces: an actionless Spending header and a Timeline desktop header ordered as `+ New task`, then `+ New event`.
+- Consumes: `headerActionsForRoute(route)`, `HeaderActionKind`, `openCreate(type: "task" | "event")`, and the existing project-route active-collection behavior.
+- Produces: optional `primaryAction` and `secondaryAction` props for `AppShell`, an actionless Spending header, and a Timeline desktop header ordered as `+ New task`, then `+ New event`.
 
 - [ ] **Step 1: Make the shared shell actions optional**
 
 Change the `AppShell` props to:
 
 ```tsx
-actionLabel?: string;
-secondaryActionLabel?: string;
-onPrimaryAction?: () => void;
-onSecondaryAction?: () => void;
+primaryAction?: {
+  label: string;
+  onClick: () => void;
+};
+secondaryAction?: {
+  label: string;
+  onClick: () => void;
+};
 ```
 
-Destructure both secondary action props. Render the mobile button only when
-`actionLabel && onPrimaryAction`. In `.header-actions`, render:
+Destructure both action props. Render the mobile button only when
+`primaryAction` exists. In `.header-actions`, render:
 
 ```tsx
-{secondaryActionLabel && onSecondaryAction ? (
-  <button className="button" type="button" onClick={onSecondaryAction}>
-    + {secondaryActionLabel}
+{secondaryAction ? (
+  <button className="button" type="button" onClick={secondaryAction.onClick}>
+    + {secondaryAction.label}
   </button>
 ) : null}
-{actionLabel && onPrimaryAction ? (
-  <button className="button button-primary" type="button" onClick={onPrimaryAction}>
-    + {actionLabel}
+{primaryAction ? (
+  <button className="button button-primary" type="button" onClick={primaryAction.onClick}>
+    + {primaryAction.label}
   </button>
 ) : null}
 ```
 
 - [ ] **Step 2: Supply route-specific actions from `HarborApp`**
 
-After `actionLabel`, add:
+Import `headerActionsForRoute` and `HeaderActionKind`. Replace
+`primaryAction` and `actionLabel` with:
 
 ```tsx
-const hasPrimaryAction = route !== "spending";
+const headerActions = headerActionsForRoute(route);
+
+const runHeaderAction = (kind: HeaderActionKind) => {
+  if (kind === "event") return openCreate("event");
+  if (kind === "task") {
+    if (route === "project") {
+      const collectionId = activeCollectionId ?? activeCollections[0]?.id;
+      if (collectionId) {
+        setItemMode({ kind: "new", type: "task", collectionId });
+        return;
+      }
+    }
+    return openCreate("task");
+  }
+  setNewProjectOpen(true);
+};
+
+const toHeaderAction = (kind: HeaderActionKind | undefined) =>
+  kind
+    ? {
+        label:
+          kind === "task"
+            ? "New task"
+            : kind === "event"
+              ? "New event"
+              : "New project",
+        onClick: () => runHeaderAction(kind),
+      }
+    : undefined;
 ```
 
 Pass these action props to `AppShell`:
 
 ```tsx
-actionLabel={hasPrimaryAction ? actionLabel : undefined}
-secondaryActionLabel={route === "timeline" ? "New task" : undefined}
-onSecondaryAction={route === "timeline" ? () => openCreate("task") : undefined}
-onPrimaryAction={hasPrimaryAction ? primaryAction : undefined}
+primaryAction={toHeaderAction(headerActions.primary)}
+secondaryAction={toHeaderAction(headerActions.secondary)}
 ```
 
 - [ ] **Step 3: Run the focused test to verify it passes**
@@ -172,7 +239,7 @@ Run:
 node --experimental-strip-types --test tests/header-actions.test.mjs
 ```
 
-Expected: PASS with two tests and zero failures.
+Expected: PASS with three tests and zero failures.
 
 - [ ] **Step 4: Commit the implementation**
 
