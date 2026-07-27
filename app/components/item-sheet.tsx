@@ -9,6 +9,7 @@ import {
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import { cancelFileRename } from "@/lib/file-rename-editor";
 import { splitFilename } from "@/lib/file-renaming";
 import { buildUploadedFiles } from "@/lib/item-uploaded-files";
 import {
@@ -451,7 +452,12 @@ function ItemSheetContent({
                         className="button button-secondary"
                         type="button"
                         disabled={pending}
-                        onClick={() => setRenamingFileId(null)}
+                        onClick={() =>
+                          cancelFileRename(
+                            setLocalError,
+                            setRenamingFileId,
+                          )
+                        }
                       >
                         Cancel
                       </button>
