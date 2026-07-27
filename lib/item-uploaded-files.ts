@@ -1,3 +1,7 @@
+import {
+  canManagePayment,
+  type ProjectActor,
+} from "./authorization.ts";
 import type { ItemFileRecord, PaymentRecord } from "./domain.ts";
 
 export type UploadedItemFile =
@@ -9,6 +13,7 @@ export type UploadedItemFile =
       createdAt: string;
       detail: string;
       removable: true;
+      renameable: boolean;
     }
   | {
       kind: "receipt";
@@ -18,11 +23,13 @@ export type UploadedItemFile =
       createdAt: string;
       detail: string;
       removable: false;
+      renameable: boolean;
     };
 
 export function buildUploadedFiles(
   attachments: ItemFileRecord[],
   payments: PaymentRecord[],
+  actor: ProjectActor | null,
 ): UploadedItemFile[] {
   return [
     ...attachments.map(
@@ -34,6 +41,7 @@ export function buildUploadedFiles(
         createdAt: file.createdAt,
         detail: `${(file.sizeBytes / 1024).toFixed(file.sizeBytes > 1024 * 1024 ? 0 : 1)} KB · ${file.contentType}`,
         removable: true,
+        renameable: actor !== null,
       }),
     ),
     ...payments.flatMap((payment): UploadedItemFile[] =>
@@ -47,6 +55,7 @@ export function buildUploadedFiles(
               createdAt: payment.receiptCreatedAt ?? payment.createdAt,
               detail: `Payment receipt · ${payment.paidOn}`,
               removable: false,
+              renameable: actor ? canManagePayment(actor, payment) : false,
             },
           ]
         : [],

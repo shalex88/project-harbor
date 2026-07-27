@@ -17,7 +17,12 @@ type UploadInput = {
   onProgress(value: number): void;
 };
 
-async function readResponse<T>(response: Response): Promise<T> {
+async function readResponse<T>(
+  response: Response,
+  failureMessage = "The upload could not be completed",
+  payloadTooLargeMessage: string | null =
+    "The upload is too large for Project Harbor",
+): Promise<T> {
   const text = await response.text();
   let data: unknown = null;
   if (text) {
@@ -36,12 +41,12 @@ async function readResponse<T>(response: Response): Promise<T> {
     ) {
       throw new Error((data as { error: string }).error);
     }
-    if (response.status === 413) {
-      throw new Error("The upload is too large for Project Harbor");
+    if (response.status === 413 && payloadTooLargeMessage) {
+      throw new Error(payloadTooLargeMessage);
     }
-    throw new Error("The upload could not be completed");
+    throw new Error(failureMessage);
   }
-  if (data === null) throw new Error("The upload could not be completed");
+  if (data === null) throw new Error(failureMessage);
   return data as T;
 }
 
@@ -130,4 +135,24 @@ export async function uploadFileInChunks({
     }
     throw error;
   }
+}
+
+export async function renameUploadedFile({
+  fileObjectId,
+  baseName,
+  request = fetch,
+}: {
+  fileObjectId: string;
+  baseName: string;
+  request?: RequestAdapter;
+}): Promise<WorkspaceSnapshot> {
+  return readResponse<WorkspaceSnapshot>(
+    await request(`/api/files?id=${encodeURIComponent(fileObjectId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseName }),
+    }),
+    "The file could not be renamed",
+    null,
+  );
 }

@@ -70,13 +70,15 @@ test("uploaded files merge attachments and receipts newest first", () => {
         updatedAt: "2026-07-03T10:00:00.000Z",
       },
     ],
+    { userId: "user-1", role: "member" },
   );
 
   assert.deepEqual(
-    uploaded.map(({ kind, filename, removable, detail }) => ({
+    uploaded.map(({ kind, filename, removable, renameable, detail }) => ({
       kind,
       filename,
       removable,
+      renameable,
       detail,
     })),
     [
@@ -84,12 +86,14 @@ test("uploaded files merge attachments and receipts newest first", () => {
         kind: "receipt",
         filename: "receipt.pdf",
         removable: false,
+        renameable: true,
         detail: "Payment receipt · 2026-07-02",
       },
       {
         kind: "attachment",
         filename: "plans.pdf",
         removable: true,
+        renameable: true,
         detail: "2.0 KB · application/pdf",
       },
     ],
@@ -101,12 +105,59 @@ test("uploaded files merge attachments and receipts newest first", () => {
   );
 });
 
+test("uploaded file rename permissions cover attachments and manageable receipts", () => {
+  const attachments = [
+    {
+      id: "item-file-1",
+      itemId: "item-1",
+      fileObjectId: "file-1",
+      filename: "plans.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 2048,
+      uploadedBy: "user-2",
+      uploadedByName: "Teammate",
+      createdAt: "2026-07-02T10:00:00.000Z",
+    },
+  ];
+  const payments = [
+    {
+      id: "payment-1",
+      itemId: "item-1",
+      amountMinor: 100,
+      paidOn: "2026-07-02",
+      note: "Fee",
+      createdBy: "user-2",
+      createdByName: "Teammate",
+      receiptFileId: "receipt-1",
+      receiptFilename: "receipt.pdf",
+      receiptCreatedAt: "2026-07-03T10:00:00.000Z",
+      createdAt: "2026-07-01T10:00:00.000Z",
+      updatedAt: "2026-07-01T10:00:00.000Z",
+    },
+  ];
+
+  const memberFiles = uploadedFilesModule.buildUploadedFiles(
+    attachments,
+    payments,
+    { userId: "user-1", role: "member" },
+  );
+  assert.equal(memberFiles[0].renameable, false);
+  assert.equal(memberFiles[1].renameable, true);
+
+  const ownerFiles = uploadedFilesModule.buildUploadedFiles(
+    attachments,
+    payments,
+    { userId: "owner", role: "owner" },
+  );
+  assert.equal(ownerFiles.every((file) => file.renameable), true);
+});
+
 test("Files exposes receipt downloads and clear attachment removal", () => {
   assert.match(itemSource, /Files \(\$\{uploadedFiles\.length\}\)/);
-  assert.match(itemSource, />Remove file</);
+  assert.match(itemSource, />\s*Remove file\s*</);
   assert.match(
     itemSource,
-    /file\.removable[\s\S]*?<button[\s\S]*?disabled=\{pending\}[\s\S]*?>Remove file<\/button>/,
+    /file\.removable[\s\S]*?<button[\s\S]*?disabled=\{pending\}[\s\S]*?>\s*Remove file\s*<\/button>/,
   );
   assert.doesNotMatch(itemSource, /Pin file|Unpin file|className="file-mark"/);
 });

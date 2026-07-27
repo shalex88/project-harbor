@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { MAX_UPLOAD_BYTES } from "../lib/chunked-upload.ts";
-import { uploadFileInChunks } from "../lib/upload-client.ts";
+import {
+  renameUploadedFile,
+  uploadFileInChunks,
+} from "../lib/upload-client.ts";
 
 const uploadId = "5a6cf3ea-1cee-4e33-9486-80e3f03db343";
 
@@ -64,6 +67,47 @@ test("uploads a file as sequential chunks and completes at 100 percent", async (
   assert.equal(progress[0], 0);
   assert.equal(progress.at(-1), 100);
   assert.ok(progress.slice(0, -1).every((value) => value < 100));
+});
+
+test("renaming sends only the base name and returns the refreshed snapshot", async () => {
+  const calls = [];
+  const snapshot = await renameUploadedFile({
+    fileObjectId: "file/1",
+    baseName: "Quarterly plan",
+    request: async (url, init = {}) => {
+      calls.push({
+        url: String(url),
+        method: init.method,
+        contentType: new Headers(init.headers).get("Content-Type"),
+        body: JSON.parse(String(init.body)),
+      });
+      return json({ generatedAt: "2026-07-27T12:00:00.000Z" });
+    },
+  });
+
+  assert.deepEqual(calls, [
+    {
+      url: "/api/files?id=file%2F1",
+      method: "PATCH",
+      contentType: "application/json",
+      body: { baseName: "Quarterly plan" },
+    },
+  ]);
+  assert.deepEqual(snapshot, {
+    generatedAt: "2026-07-27T12:00:00.000Z",
+  });
+});
+
+test("rename gateway failures use a rename-specific fallback", async () => {
+  await assert.rejects(
+    () =>
+      renameUploadedFile({
+        fileObjectId: "file-1",
+        baseName: "Quarterly plan",
+        request: async () => new Response("Bad gateway", { status: 502 }),
+      }),
+    /could not be renamed/i,
+  );
 });
 
 test("a failed chunk prevents completion and cancels the session", async () => {

@@ -29,6 +29,8 @@ import {
 } from "./domain";
 import { canManagePayment, normalizeEmail } from "./authorization";
 import type { IdentityUser } from "./auth";
+import { FILE_RENAME_UPDATE_SQL } from "./file-rename-persistence";
+import { createFileRenameService } from "./file-rename-service";
 import {
   DIRECTED_RELATION_INSERT_SQL,
   directedRelationInsertParams,
@@ -1404,6 +1406,24 @@ export async function authorizeFileTarget(
     return { projectId: context.projectId };
   }
   throw new DomainError("An item or payment is required");
+}
+
+export async function renameFileMetadata(
+  identity: IdentityUser,
+  fileId: string,
+  baseName: string,
+): Promise<WorkspaceSnapshot> {
+  return createFileRenameService({
+    prepare: ensurePreviewSchema,
+    getUser: syncUser,
+    getFileContext,
+    requireProjectAccess,
+    getPaymentContext: paymentContext,
+    updateFilename: async (targetFileId, filename) => {
+      await run(FILE_RENAME_UPDATE_SQL, filename, targetFileId);
+    },
+    loadSnapshot: loadWorkspaceSnapshot,
+  }).rename(identity, fileId, baseName);
 }
 
 export async function deleteFileMetadata(

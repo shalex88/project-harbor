@@ -163,6 +163,22 @@ test("upload policy rejects executables and oversized item files", () => {
   assert.throws(
     () =>
       validateUpload(
+        { name: ".JS", type: "application/octet-stream", size: 12 },
+        "item",
+      ),
+    /unsupported/i,
+  );
+  assert.throws(
+    () =>
+      validateUpload(
+        { name: "run.exe.", type: "application/octet-stream", size: 12 },
+        "item",
+      ),
+    /unsupported/i,
+  );
+  assert.throws(
+    () =>
+      validateUpload(
         {
           name: "large.pdf",
           type: "application/pdf",

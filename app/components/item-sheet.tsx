@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type DragEvent, type FormEvent } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 import {
   formatMoney,
   moneyInputValue,
@@ -9,6 +9,8 @@ import {
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import { cancelFileRename } from "@/lib/file-rename-editor";
+import { splitFilename } from "@/lib/file-renaming";
 import { buildUploadedFiles } from "@/lib/item-uploaded-files";
 import {
   confirmReceiptDeletion,
@@ -35,6 +37,7 @@ export function ItemSheet({
   onOpenItem,
   onStartFollowUp,
   onUpload,
+  onRenameFile,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -46,6 +49,7 @@ export function ItemSheet({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const key =
@@ -78,6 +82,7 @@ export function ItemSheet({
           onOpenItem={onOpenItem}
           onStartFollowUp={onStartFollowUp}
           onUpload={onUpload}
+          onRenameFile={onRenameFile}
           onDeleteFile={onDeleteFile}
         />
       ) : null}
@@ -95,6 +100,7 @@ function ItemSheetContent({
   onOpenItem,
   onStartFollowUp,
   onUpload,
+  onRenameFile,
   onDeleteFile,
 }: {
   snapshot: WorkspaceSnapshot;
@@ -106,6 +112,7 @@ function ItemSheetContent({
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const item = mode.kind === "existing" ? snapshot.items.find((candidate) => candidate.id === mode.itemId) ?? null : null;
@@ -123,13 +130,17 @@ function ItemSheetContent({
   const [tab, setTab] = useState<"details" | "files" | "payments" | "relations">("details");
   const [localError, setLocalError] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [editingPayment, setEditingPayment] = useState<PaymentRecord | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const currency = project?.currency ?? "USD";
 
-  const uploadedFiles = useMemo(
-    () => buildUploadedFiles(item?.files ?? [], item?.payments ?? []),
-    [item?.files, item?.payments],
+  const uploadedFiles = buildUploadedFiles(
+    item?.files ?? [],
+    item?.payments ?? [],
+    project
+      ? { userId: snapshot.user.id, role: project.role }
+      : null,
   );
 
   if (mode.kind === "existing" && !item) {
@@ -369,17 +380,135 @@ function ItemSheetContent({
             ) : null}
           </div>
           <div className="file-list">
-            {uploadedFiles.map((file) => (
-              <article key={`${file.kind}-${file.id}`} className={`file-row file-row-${file.kind}`}>
-                <span className="row-title"><strong dir="auto">{file.filename}</strong><small>{file.detail}</small></span>
-                <div className="file-actions">
-                  <a className="button button-secondary" href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}>Download</a>
-                  {file.removable ? (
-                    <button className="button button-danger" type="button" disabled={pending} onClick={() => { if (window.confirm(`Remove ${file.filename}?`)) void onDeleteFile(file.fileObjectId); }}>Remove file</button>
-                  ) : null}
-                </div>
-              </article>
-            ))}
+            {uploadedFiles.map((file) => {
+              const fileNameParts = splitFilename(file.filename);
+              const isRenaming = renamingFileId === file.fileObjectId;
+              const extensionDescriptionId =
+                `file-${file.fileObjectId}-locked-extension`;
+              return (
+                <article
+                  key={`${file.kind}-${file.id}`}
+                  className={`file-row file-row-${file.kind}`}
+                >
+                  {isRenaming ? (
+                    <form
+                      className="file-rename-form"
+                      onSubmit={async (event) => {
+                        event.preventDefault();
+                        setLocalError("");
+                        const baseName = String(
+                          new FormData(event.currentTarget).get("baseName") ??
+                            "",
+                        );
+                        try {
+                          await onRenameFile(file.fileObjectId, baseName);
+                          setRenamingFileId(null);
+                        } catch (error) {
+                          setLocalError(
+                            error instanceof Error
+                              ? error.message
+                              : "Unable to rename the file",
+                          );
+                        }
+                      }}
+                    >
+                      <label className="file-rename-name">
+                        <span className="sr-only">File name</span>
+                        <input
+                          name="baseName"
+                          defaultValue={fileNameParts.baseName}
+                          autoFocus
+                          disabled={pending}
+                          aria-label={`Rename ${file.filename} base name`}
+                          aria-describedby={
+                            fileNameParts.extension
+                              ? extensionDescriptionId
+                              : undefined
+                          }
+                        />
+                        {fileNameParts.extension ? (
+                          <span
+                            id={extensionDescriptionId}
+                            className="file-rename-extension"
+                            title={`Locked extension ${fileNameParts.extension}`}
+                          >
+                            <span aria-hidden="true">
+                              {fileNameParts.extension}
+                            </span>
+                            <span className="sr-only">
+                              Locked extension: {fileNameParts.extension}
+                            </span>
+                          </span>
+                        ) : null}
+                      </label>
+                      <button
+                        className="button button-primary"
+                        type="submit"
+                        disabled={pending}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="button button-secondary"
+                        type="button"
+                        disabled={pending}
+                        onClick={() =>
+                          cancelFileRename(
+                            setLocalError,
+                            setRenamingFileId,
+                          )
+                        }
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="row-title">
+                        <strong dir="auto">{file.filename}</strong>
+                        <small>{file.detail}</small>
+                      </span>
+                      <div className="file-actions">
+                        <a
+                          className="button button-secondary"
+                          href={`/api/files?id=${encodeURIComponent(file.fileObjectId)}`}
+                        >
+                          Download
+                        </a>
+                        {file.renameable ? (
+                          <button
+                            className="button button-secondary"
+                            type="button"
+                            disabled={pending}
+                            aria-label={`Rename ${file.filename}`}
+                            onClick={() => {
+                              setLocalError("");
+                              setRenamingFileId(file.fileObjectId);
+                            }}
+                          >
+                            Rename
+                          </button>
+                        ) : null}
+                        {file.removable ? (
+                          <button
+                            className="button button-danger"
+                            type="button"
+                            disabled={pending}
+                            onClick={() => {
+                              if (window.confirm(`Remove ${file.filename}?`)) {
+                                void onDeleteFile(file.fileObjectId);
+                              }
+                            }}
+                          >
+                            Remove file
+                          </button>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </article>
+              );
+            })}
             {!uploadedFiles.length ? <EmptyState title="No files attached" description="Attach documents, images, receipts, archives, or other project material to this item." /> : null}
           </div>
         </section>

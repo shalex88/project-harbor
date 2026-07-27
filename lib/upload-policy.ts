@@ -1,40 +1,11 @@
 import { DomainError } from "./domain.ts";
 import { MAX_UPLOAD_BYTES } from "./chunked-upload.ts";
+import { assertSupportedFilename } from "./file-safety.ts";
 
 type FileDescriptor = { name: string; type: string; size: number };
 export type UploadKind = "item" | "receipt";
 const ARCHIVE_ITEM_MAX_BYTES = 25 * 1024 * 1024;
 const ARCHIVE_RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
-
-const EXECUTABLE_EXTENSIONS = new Set([
-  "app",
-  "bat",
-  "bin",
-  "cmd",
-  "com",
-  "cpl",
-  "dll",
-  "dmg",
-  "exe",
-  "gadget",
-  "hta",
-  "ins",
-  "iso",
-  "jar",
-  "js",
-  "jse",
-  "lnk",
-  "msi",
-  "msp",
-  "pif",
-  "ps1",
-  "reg",
-  "scr",
-  "sh",
-  "vbe",
-  "vbs",
-  "wsf",
-]);
 
 function safeFilename(value: string): string {
   const leaf = value.split(/[\\/]/).at(-1) ?? "file";
@@ -56,13 +27,8 @@ function validateUploadWithLimit(
   if (file.size > maximumBytes) {
     throw new DomainError(`Files must be ${maximumLabel} or smaller`);
   }
-  const extension = filename.includes(".")
-    ? filename.split(".").at(-1)?.toLowerCase() ?? ""
-    : "";
-  if (
-    EXECUTABLE_EXTENSIONS.has(extension) ||
-    /(?:x-msdownload|x-executable|x-sh|javascript)/i.test(contentType)
-  ) {
+  assertSupportedFilename(filename);
+  if (/(?:x-msdownload|x-executable|x-sh|javascript)/i.test(contentType)) {
     throw new DomainError("That executable file type is unsupported");
   }
   if (

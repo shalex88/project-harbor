@@ -4,6 +4,7 @@ import {
   readUploadChunk,
 } from "@/lib/chunked-upload";
 import { DomainError } from "@/lib/domain";
+import { createFileRenameHandler } from "@/lib/file-rename-handler";
 import { errorResponse } from "@/lib/http";
 import { createFileUploadService } from "@/lib/file-upload-service";
 import {
@@ -13,6 +14,7 @@ import {
   getFileContext,
   getUserByIdentity,
   loadWorkspaceSnapshot,
+  renameFileMetadata,
   requireProjectAccess,
 } from "@/lib/repository";
 import {
@@ -38,6 +40,12 @@ const fileUploadService = createFileUploadService({
   loadSnapshot: loadWorkspaceSnapshot,
   randomUUID: () => crypto.randomUUID(),
   now: () => new Date(),
+});
+
+const renameFileHandler = createFileRenameHandler({
+  requireUser: requireAppUser,
+  renameFile: renameFileMetadata,
+  handleError: errorResponse,
 });
 
 export async function GET(request: Request) {
@@ -97,6 +105,10 @@ export async function POST(request: Request) {
   } catch (error) {
     return errorResponse(error);
   }
+}
+
+export async function PATCH(request: Request) {
+  return renameFileHandler(request);
 }
 
 export async function DELETE(request: Request) {
