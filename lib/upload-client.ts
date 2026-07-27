@@ -131,3 +131,21 @@ export async function uploadFileInChunks({
     throw error;
   }
 }
+
+export async function renameUploadedFile({
+  fileObjectId,
+  baseName,
+  request = fetch,
+}: {
+  fileObjectId: string;
+  baseName: string;
+  request?: RequestAdapter;
+}): Promise<WorkspaceSnapshot> {
+  return readResponse<WorkspaceSnapshot>(
+    await request(`/api/files?id=${encodeURIComponent(fileObjectId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ baseName }),
+    }),
+  );
+}

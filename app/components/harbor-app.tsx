@@ -13,7 +13,10 @@ import type {
   WorkspaceMutationResult,
   WorkspaceSnapshot,
 } from "@/lib/domain";
-import { uploadFileInChunks } from "@/lib/upload-client";
+import {
+  renameUploadedFile,
+  uploadFileInChunks,
+} from "@/lib/upload-client";
 import { AppShell, type AppRoute } from "./app-shell";
 import {
   EventsDashboard,
@@ -251,6 +254,22 @@ export function HarborApp({
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to remove the file";
+      pushToast(message, "error");
+      throw error;
+    } finally {
+      setPending(false);
+    }
+  };
+
+  const renameFile = async (fileObjectId: string, baseName: string) => {
+    setPending(true);
+    try {
+      const next = await renameUploadedFile({ fileObjectId, baseName });
+      acceptSnapshot(next);
+      pushToast("File renamed");
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to rename the file";
       pushToast(message, "error");
       throw error;
     } finally {
@@ -556,6 +575,7 @@ export function HarborApp({
           setItemMode({ kind: "follow-up", sourceEventId, collectionId })
         }
         onUpload={upload}
+        onRenameFile={renameFile}
         onDeleteFile={deleteFile}
       />
 

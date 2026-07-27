@@ -511,7 +511,7 @@ git commit -m "feat: add protected file rename endpoint"
 - Produces: `onRenameFile(fileObjectId: string, baseName: string): Promise<void>` from `HarborApp` through `ItemSheet`.
 - Consumes: `PATCH /api/files?id=<fileObjectId>` from Task 2.
 
-- [ ] **Step 1: Write failing permission and rename-client tests**
+- [x] **Step 1: Write failing permission and rename-client tests**
 
 Extend `tests/receipt-files-ui.test.mjs` to pass
 `{ userId: "user-1", role: "member" }` as the third
@@ -603,7 +603,7 @@ test("renaming sends only the base name and returns the refreshed snapshot", asy
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 Run:
 
@@ -616,7 +616,7 @@ node --experimental-strip-types --test \
 Expected: the permission assertion fails because `renameable` does not exist,
 and the upload-client test fails because `renameUploadedFile` is not exported.
 
-- [ ] **Step 3: Derive rename visibility in the uploaded-file builder**
+- [x] **Step 3: Derive rename visibility in the uploaded-file builder**
 
 Import `canManagePayment` and the `ProjectActor` type from
 `lib/authorization.ts`.
@@ -631,7 +631,7 @@ renameable: actor ? canManagePayment(actor, payment) : false,
 
 Keep the existing merged ordering, `removable`, labels, IDs, and details.
 
-- [ ] **Step 4: Implement the rename request**
+- [x] **Step 4: Implement the rename request**
 
 Add this exported function to `lib/upload-client.ts`, reusing its existing
 `RequestAdapter` and `readResponse` boundary:
@@ -656,7 +656,7 @@ export async function renameUploadedFile({
 }
 ```
 
-- [ ] **Step 5: Add the client rename callback**
+- [x] **Step 5: Add the client rename callback**
 
 Import `renameUploadedFile` in `app/components/harbor-app.tsx`, then add beside
 `deleteFile`:
@@ -681,7 +681,7 @@ const renameFile = async (fileObjectId: string, baseName: string) => {
 
 Pass it to `ItemSheet` as `onRenameFile={renameFile}`.
 
-- [ ] **Step 6: Verify the browser flow is RED before rendering the editor**
+- [x] **Step 6: Verify the browser flow is RED before rendering the editor**
 
 Start the development app, upload an attachment to an existing item, and use
 browser automation to locate a `Rename` button in its Files row.
@@ -689,7 +689,7 @@ browser automation to locate a `Rename` button in its Files row.
 Expected: the assertion fails because the existing row has only Download and
 Remove file. Keep the same browser flow for the GREEN check in Task 4.
 
-- [ ] **Step 7: Render the inline editor**
+- [x] **Step 7: Render the inline editor**
 
 In `app/components/item-sheet.tsx`:
 
@@ -768,7 +768,7 @@ The normal action group adds:
 ) : null}
 ```
 
-- [ ] **Step 8: Style desktop and mobile editors**
+- [x] **Step 8: Style desktop and mobile editors**
 
 Add desktop rules near the existing file-list styles:
 
@@ -829,7 +829,7 @@ Inside the existing mobile media query, add:
 }
 ```
 
-- [ ] **Step 9: Run focused behavior tests and verify GREEN**
+- [x] **Step 9: Run focused behavior tests and verify GREEN**
 
 Run:
 
@@ -844,7 +844,7 @@ node --experimental-strip-types --test \
 
 Expected: all focused tests pass.
 
-- [ ] **Step 10: Commit the inline editor**
+- [x] **Step 10: Commit the inline editor**
 
 ```bash
 git add \
