@@ -25,6 +25,10 @@ import {
   TasksDashboard,
   TimelineDashboard,
 } from "./dashboards";
+import {
+  headerActionsForRoute,
+  type HeaderActionKind,
+} from "./header-actions";
 import { ItemSheet, type ItemSheetMode } from "./item-sheet";
 import { shouldLeaveDeletedProjectRoute } from "./project-delete-navigation";
 import { ProjectWorkspace } from "./project-workspace";
@@ -390,27 +394,35 @@ export function HarborApp({
     setCreateLocation({ type, projectId, collectionId });
   };
 
-  const primaryAction = () => {
-    if (route === "tasks") return openCreate("task");
-    if (route === "events" || route === "timeline") {
-      return openCreate("event");
-    }
-    if (route === "project") {
-      const collectionId = activeCollectionId ?? activeCollections[0]?.id;
-      if (collectionId) {
-        setItemMode({ kind: "new", type: "task", collectionId });
-        return;
+  const headerActions = headerActionsForRoute(route);
+
+  const runHeaderAction = (kind: HeaderActionKind) => {
+    if (kind === "event") return openCreate("event");
+    if (kind === "task") {
+      if (route === "project") {
+        const collectionId = activeCollectionId ?? activeCollections[0]?.id;
+        if (collectionId) {
+          setItemMode({ kind: "new", type: "task", collectionId });
+          return;
+        }
       }
+      return openCreate("task");
     }
     setNewProjectOpen(true);
   };
 
-  const actionLabel =
-    route === "tasks" || route === "project"
-      ? "New task"
-      : route === "events" || route === "timeline"
-        ? "New event"
-        : "New project";
+  const toHeaderAction = (kind: HeaderActionKind | undefined) =>
+    kind
+      ? {
+          label:
+            kind === "task"
+              ? "New task"
+              : kind === "event"
+                ? "New event"
+                : "New project",
+          onClick: () => runHeaderAction(kind),
+        }
+      : undefined;
   const title =
     route === "overview"
       ? `Good morning, ${snapshot.user.displayName.split(" ")[0]}`
@@ -550,7 +562,8 @@ export function HarborApp({
         route={route}
         activeProjectId={activeProjectId}
         title={title}
-        actionLabel={actionLabel}
+        primaryAction={toHeaderAction(headerActions.primary)}
+        secondaryAction={toHeaderAction(headerActions.secondary)}
         onRouteChange={navigate}
         onProjectSelect={selectProject}
         onProjectRename={renameProject}
@@ -558,7 +571,6 @@ export function HarborApp({
         onProjectDelete={deleteProject}
         exportingProjectId={exportingProjectId}
         projectMutationPending={pending}
-        onPrimaryAction={primaryAction}
       >
         {content}
       </AppShell>
