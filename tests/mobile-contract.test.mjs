@@ -38,6 +38,11 @@ test("tablet widths retain primary navigation when the sidebar collapses", async
 test("mobile workspace headers keep page-specific creation actions visible", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   const mobileStart = css.indexOf("@media (max-width: 640px)");
+  assert.notEqual(
+    mobileStart,
+    -1,
+    "responsive styles must include the mobile breakpoint",
+  );
   const mobile = css.slice(mobileStart);
   assert.doesNotMatch(
     mobile,
