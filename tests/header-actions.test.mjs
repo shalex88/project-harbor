@@ -48,6 +48,65 @@ test("other routes preserve their existing primary creation action", () => {
   );
 });
 
+test("mobile header omits the generic create action while preserving the page-specific action", () => {
+  const renderScript = `
+    import React from "react";
+    import { renderToStaticMarkup } from "react-dom/server";
+    import { AppShell } from "./app/components/app-shell.tsx";
+
+    const noop = () => {};
+    const asyncNoop = async () => {};
+    const html = renderToStaticMarkup(React.createElement(AppShell, {
+      user: {
+        id: "user-1",
+        displayName: "Alex Smith",
+        email: "alex@example.com",
+      },
+      projects: [],
+      route: "tasks",
+      activeProjectId: null,
+      title: "Tasks",
+      primaryAction: { label: "New task", onClick: noop },
+      onRouteChange: noop,
+      onProjectSelect: noop,
+      onProjectRename: asyncNoop,
+      onProjectExport: asyncNoop,
+      onProjectDelete: asyncNoop,
+      exportingProjectId: null,
+      projectMutationPending: false,
+    }, null));
+
+    process.stdout.write(html);
+  `;
+  const html = execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", renderScript],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+    },
+  );
+  const mobileStart = html.indexOf('<header class="mobile-header">');
+  const workspaceStart = html.indexOf('<header class="workspace-header">');
+  const workspaceEnd = html.indexOf('<main class="workspace-main">');
+  assert.notEqual(mobileStart, -1, "rendered shell must include the mobile header");
+  assert.notEqual(
+    workspaceStart,
+    -1,
+    "rendered shell must include the workspace header",
+  );
+  assert.notEqual(
+    workspaceEnd,
+    -1,
+    "rendered shell must include the workspace main marker",
+  );
+
+  const mobileHeader = html.slice(mobileStart, workspaceStart);
+  const workspaceHeader = html.slice(workspaceStart, workspaceEnd);
+  assert.doesNotMatch(mobileHeader, />\+ Create</);
+  assert.match(workspaceHeader, />\+ New task<\/button>/);
+});
+
 test("timeline task and event actions use the same primary button design", () => {
   const renderScript = `
     import React from "react";

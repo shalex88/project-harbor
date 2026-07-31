@@ -213,11 +213,6 @@ export function AppShell({
             <span aria-hidden="true">⚓</span>
             Harbor
           </button>
-          {primaryAction ? (
-            <button className="button button-primary mobile-create" type="button" onClick={primaryAction.onClick}>
-              + Create
-            </button>
-          ) : null}
         </header>
         <header className="workspace-header">
           <div>

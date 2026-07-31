@@ -2397,6 +2397,7 @@ strong.work-item-title {
   }
 
   .workspace-header {
+    flex-wrap: wrap;
     min-height: 88px;
     padding: 20px 16px 14px;
   }
@@ -2406,7 +2407,15 @@ strong.work-item-title {
   }
 
   .header-actions {
-    display: none;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .header-actions .button {
+    padding: 0 14px;
   }
 
   .workspace-main {
