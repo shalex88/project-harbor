@@ -35,6 +35,24 @@ test("tablet widths retain primary navigation when the sidebar collapses", async
   assert.match(tablet, /\.mobile-nav[\s\S]*display:\s*grid/);
 });
 
+test("mobile workspace headers keep page-specific creation actions visible", async () => {
+  const css = await readFile(new URL("app/globals.css", root), "utf8");
+  const mobileStart = css.indexOf("@media (max-width: 640px)");
+  const mobile = css.slice(mobileStart);
+  assert.doesNotMatch(
+    mobile,
+    /\.header-actions\s*\{[^}]*display:\s*none/,
+  );
+  assert.match(
+    mobile,
+    /\.workspace-header\s*\{[^}]*flex-wrap:\s*wrap/,
+  );
+  assert.match(
+    mobile,
+    /\.header-actions\s*\{[^}]*display:\s*flex[^}]*flex-wrap:\s*wrap/,
+  );
+});
+
 test("reduced motion is respected", async () => {
   const css = await readFile(new URL("app/globals.css", root), "utf8");
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
