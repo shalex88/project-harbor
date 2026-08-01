@@ -16,6 +16,29 @@ export type TaskStatus = "todo" | "done";
 export type ItemType = "task" | "event";
 export type RelationType = "follows_from" | "blocks" | "related_to";
 export type ProjectRole = "owner" | "member";
+export type ContactMentionField = "title" | "description";
+
+export type ContactMentionInput = {
+  contactId: string;
+  field: ContactMentionField;
+  startOffset: number;
+  endOffset: number;
+};
+
+export type WorkItemContactLinkRecord = {
+  contactId: string;
+  manuallyLinked: boolean;
+};
+
+export type WorkItemContactMentionRecord = ContactMentionInput & {
+  id: string;
+  itemId: string;
+};
+
+export type WorkItemContactMutationFields = {
+  manualContactIds?: string[];
+  contactMentions?: ContactMentionInput[];
+};
 
 export type AppUser = {
   id: string;
@@ -205,7 +228,7 @@ export type WorkspaceMutation =
       collectionIds: string[];
     }
   | { action: "delete_collection"; collectionId: string }
-  | {
+  | ({
       action: "create_item";
       collectionId: string;
       type: "task";
@@ -214,8 +237,8 @@ export type WorkspaceMutation =
       status: TaskStatus;
       dueDate?: string | null;
       estimatedCostMinor?: number | null;
-    }
-  | {
+    } & WorkItemContactMutationFields)
+  | ({
       action: "create_item";
       collectionId: string;
       type: "event";
@@ -223,8 +246,8 @@ export type WorkspaceMutation =
       description?: string;
       occurrenceDate: string;
       estimatedCostMinor?: number | null;
-    }
-  | {
+    } & WorkItemContactMutationFields)
+  | ({
       action: "update_item";
       itemId: string;
       type: "task";
@@ -233,8 +256,8 @@ export type WorkspaceMutation =
       status: TaskStatus;
       dueDate?: string | null;
       estimatedCostMinor?: number | null;
-    }
-  | {
+    } & WorkItemContactMutationFields)
+  | ({
       action: "update_item";
       itemId: string;
       type: "event";
@@ -242,9 +265,9 @@ export type WorkspaceMutation =
       description?: string;
       occurrenceDate: string;
       estimatedCostMinor?: number | null;
-    }
+    } & WorkItemContactMutationFields)
   | { action: "delete_item"; itemId: string }
-  | {
+  | ({
       action: "create_follow_up_task";
       sourceEventId: string;
       collectionId: string;
@@ -253,7 +276,7 @@ export type WorkspaceMutation =
       status: TaskStatus;
       dueDate?: string | null;
       estimatedCostMinor?: number | null;
-    }
+    } & WorkItemContactMutationFields)
   | {
       action: "create_relation";
       sourceItemId: string;
