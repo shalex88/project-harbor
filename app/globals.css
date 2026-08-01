@@ -1623,6 +1623,106 @@ strong.work-item-title {
   font-size: 11px;
 }
 
+.contact-action {
+  position: relative;
+  display: inline;
+}
+
+.contact-mention-trigger {
+  display: inline;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cyan) 16%, transparent);
+  color: var(--cyan);
+  cursor: pointer;
+  padding: 1px 3px;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  unicode-bidi: isolate;
+}
+
+.contact-mention-trigger:hover,
+.contact-mention-trigger:focus-visible,
+.contact-mention-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--cyan) 25%, transparent);
+  outline: none;
+}
+
+.contact-mention-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--cyan);
+}
+
+.contact-action-popover {
+  position: absolute;
+  z-index: 150;
+  inset-block-start: calc(100% + 7px);
+  inset-inline-start: 0;
+  display: grid;
+  width: max-content;
+  min-width: 190px;
+  max-width: min(300px, calc(100vw - 24px));
+  gap: 3px;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  padding: 10px;
+  text-align: start;
+}
+
+.contact-action-popover small {
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+}
+
+.contact-action-popover a,
+.contact-action-popover button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: start;
+  text-decoration: none;
+  font: inherit;
+}
+
+.contact-action-popover a:hover,
+.contact-action-popover a:focus-visible,
+.contact-action-popover button:hover,
+.contact-action-popover button:focus-visible {
+  background: var(--selected);
+  outline: none;
+}
+
+.contact-details-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.contact-details-modal > div:first-child,
+.contact-details-modal p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.contact-details-modal span,
+.contact-details-modal p > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.contact-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .member-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
