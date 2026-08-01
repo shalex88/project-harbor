@@ -92,6 +92,8 @@ export function createProjectTransferService(
         contacts: source.contacts,
         collections: source.collections,
         items: source.items,
+        itemContacts: source.itemContacts,
+        contactMentions: source.contactMentions,
         relations: source.relations,
         payments: source.payments,
         attachments,

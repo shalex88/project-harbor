@@ -61,7 +61,7 @@ async function importFixture() {
         id: "task-1",
         collectionId: "collection-1",
         type: "task",
-        title: "Plans",
+        title: "Call @Architect",
         description: "",
         status: "todo",
         dueDate: null,
@@ -69,6 +69,18 @@ async function importFixture() {
         creatorLabel: "Alex",
         createdAt: "2026-07-01T10:00:00.000Z",
         updatedAt: "2026-07-01T10:00:00.000Z",
+      },
+    ],
+    itemContacts: [
+      { itemId: "task-1", contactId: "contact-1", manuallyLinked: true },
+    ],
+    contactMentions: [
+      {
+        itemId: "task-1",
+        contactId: "contact-1",
+        field: "title",
+        startOffset: 5,
+        endOffset: 15,
       },
     ],
     relations: [],
@@ -130,6 +142,9 @@ function importPlan(manifest) {
     itemIds: new Map(),
     relationIds: new Map(),
     paymentIds: new Map(),
+    contactIds: new Map(),
+    itemContacts: [],
+    contactMentions: [],
     relations: [],
     payloads: [
       {
@@ -254,6 +269,8 @@ test("export loads every stored payload and produces a valid Harbor archive", as
     contacts: fixture.manifest.contacts,
     collections: fixture.manifest.collections,
     items: fixture.manifest.items,
+    itemContacts: fixture.manifest.itemContacts,
+    contactMentions: fixture.manifest.contactMentions,
     relations: fixture.manifest.relations,
     payments: fixture.manifest.payments,
     attachments: fixture.manifest.attachments.map(({ sha256, ...entry }) => {
@@ -288,6 +305,11 @@ test("export loads every stored payload and produces a valid Harbor archive", as
   assert.deepEqual(decoded.payloads, fixture.payloads);
   assert.equal(decoded.manifest.exportedAt, "2026-07-22T12:00:00.000Z");
   assert.deepEqual(decoded.manifest.contacts, fixture.manifest.contacts);
+  assert.deepEqual(decoded.manifest.itemContacts, fixture.manifest.itemContacts);
+  assert.deepEqual(
+    decoded.manifest.contactMentions,
+    fixture.manifest.contactMentions,
+  );
   assert.deepEqual(decoded.manifest.payments, fixture.manifest.payments);
   assert.deepEqual(decoded.manifest.attachments, fixture.manifest.attachments);
   assert.deepEqual(decoded.manifest.receipts, fixture.manifest.receipts);
@@ -301,6 +323,8 @@ test("export reflects the source's current empty payment and file state", async 
     contacts: fixture.manifest.contacts,
     collections: fixture.manifest.collections,
     items: fixture.manifest.items,
+    itemContacts: [],
+    contactMentions: [],
     relations: fixture.manifest.relations,
     payments: [],
     attachments: [],

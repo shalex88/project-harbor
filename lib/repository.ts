@@ -22,6 +22,8 @@ import {
   type ProjectRecord,
   type ProjectRole,
   type RelationType,
+  type WorkItemContactLinkRecord,
+  type WorkItemContactMentionRecord,
   type WorkItemRecord,
   type WorkItemRelationRecord,
   type WorkspaceMutation,
@@ -43,6 +45,13 @@ import {
   directedRelationInsertParams,
   isRelationUniqueConstraint,
 } from "./relation-persistence";
+import {
+  WORK_ITEM_CONTACT_INSERT_SQL,
+  WORK_ITEM_CONTACT_MENTION_INSERT_SQL,
+  validateWorkItemContactState,
+  type ContactIdentity,
+  type ValidatedWorkItemContactState,
+} from "./work-item-contact-persistence";
 
 type ProjectAccess = { projectId: string; userId: string; role: ProjectRole };
 
@@ -51,10 +60,12 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY NOT NULL, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (owner_user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','member')), joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(project_id,user_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_invitations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, accepted_at TEXT, UNIQUE(project_id,email), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(invited_by) REFERENCES users(id))`,
-  `CREATE TABLE IF NOT EXISTS project_contacts (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, role_or_company TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
+  `CREATE TABLE IF NOT EXISTS project_contacts (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, role_or_company TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'cyan', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, imported_creator_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
+  `CREATE TABLE IF NOT EXISTS work_item_contacts (project_id TEXT NOT NULL, item_id TEXT NOT NULL, contact_id TEXT NOT NULL, manually_linked INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(item_id,contact_id), UNIQUE(item_id,contact_id,project_id), FOREIGN KEY(item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(contact_id,project_id) REFERENCES project_contacts(id,project_id) ON DELETE CASCADE)`,
+  `CREATE TABLE IF NOT EXISTS work_item_contact_mentions (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, item_id TEXT NOT NULL, contact_id TEXT NOT NULL, field TEXT NOT NULL CHECK(field IN ('title','description')), start_offset INTEGER NOT NULL, end_offset INTEGER NOT NULL, CHECK(start_offset >= 0 AND end_offset > start_offset), UNIQUE(item_id,field,start_offset,end_offset), FOREIGN KEY(item_id,contact_id,project_id) REFERENCES work_item_contacts(item_id,contact_id,project_id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS work_item_relations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, source_item_id TEXT NOT NULL, target_item_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('follows_from','blocks','related_to')), created_by TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK(source_item_id <> target_item_id), CHECK(type <> 'related_to' OR source_item_id < target_item_id), UNIQUE(project_id,type,source_item_id,target_item_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(source_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(target_item_id,project_id) REFERENCES work_items(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS file_objects (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, r2_key TEXT NOT NULL UNIQUE, filename TEXT NOT NULL, content_type TEXT NOT NULL, size_bytes INTEGER NOT NULL, uploaded_by TEXT NOT NULL, imported_uploader_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(uploaded_by) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS item_files (id TEXT PRIMARY KEY NOT NULL, item_id TEXT NOT NULL, file_object_id TEXT NOT NULL UNIQUE, position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(item_id) REFERENCES work_items(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
@@ -62,15 +73,19 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS payment_receipts (payment_id TEXT PRIMARY KEY NOT NULL, file_object_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(payment_id) REFERENCES payments(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_id)`,
   `CREATE INDEX IF NOT EXISTS project_invitations_email_idx ON project_invitations(email,status)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS project_contacts_id_project_unique ON project_contacts(id,project_id)`,
   `CREATE INDEX IF NOT EXISTS project_contacts_project_name_idx ON project_contacts(project_id,name)`,
   `CREATE INDEX IF NOT EXISTS collections_project_position_idx ON collections(project_id,position)`,
   `CREATE INDEX IF NOT EXISTS work_items_collection_idx ON work_items(collection_id)`,
   `CREATE INDEX IF NOT EXISTS work_items_task_filter_idx ON work_items(project_id,type,status,due_date)`,
   `CREATE INDEX IF NOT EXISTS work_items_event_date_idx ON work_items(project_id,type,occurrence_date)`,
+  `CREATE INDEX IF NOT EXISTS work_item_contacts_contact_idx ON work_item_contacts(contact_id,item_id)`,
+  `CREATE INDEX IF NOT EXISTS work_item_contact_mentions_item_idx ON work_item_contact_mentions(item_id,field,start_offset)`,
   `CREATE INDEX IF NOT EXISTS work_item_relations_source_idx ON work_item_relations(project_id,source_item_id)`,
   `CREATE INDEX IF NOT EXISTS work_item_relations_target_idx ON work_item_relations(project_id,target_item_id)`,
   `CREATE INDEX IF NOT EXISTS item_files_item_idx ON item_files(item_id,position)`,
   `CREATE INDEX IF NOT EXISTS payments_item_date_idx ON payments(item_id,paid_on)`,
+  `PRAGMA optimize`,
 ];
 
 async function ensurePreviewSchema(): Promise<void> {
@@ -429,6 +444,26 @@ async function authorizedCollectionProject(
   return projectId;
 }
 
+async function projectContactIdentities(
+  projectId: string,
+): Promise<ContactIdentity[]> {
+  const rows = await all<{
+    id: string;
+    project_id: string;
+    name: string;
+    role_or_company: string;
+  }>(
+    "SELECT id,project_id,name,role_or_company FROM project_contacts WHERE project_id = ? ORDER BY id",
+    projectId,
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    roleOrCompany: row.role_or_company,
+  }));
+}
+
 async function projectForItem(itemId: string): Promise<string> {
   const row = await first<{ project_id: string }>(
     "SELECT project_id FROM work_items WHERE id = ?",
@@ -575,6 +610,52 @@ export async function listMutationFileKeys(
   return paymentFileKeys(mutation.paymentId);
 }
 
+function appendContactStateStatements(
+  statements: D1PreparedStatement[],
+  db: D1Database,
+  input: {
+    itemId: string;
+    projectId: string;
+    state: ValidatedWorkItemContactState;
+    replace: boolean;
+  },
+): void {
+  if (input.replace) {
+    statements.push(
+      db
+        .prepare("DELETE FROM work_item_contacts WHERE item_id = ?")
+        .bind(input.itemId),
+    );
+  }
+  for (const link of input.state.links) {
+    statements.push(
+      db
+        .prepare(WORK_ITEM_CONTACT_INSERT_SQL)
+        .bind(
+          input.projectId,
+          input.itemId,
+          link.contactId,
+          link.manuallyLinked ? 1 : 0,
+        ),
+    );
+  }
+  for (const mention of input.state.mentions) {
+    statements.push(
+      db
+        .prepare(WORK_ITEM_CONTACT_MENTION_INSERT_SQL)
+        .bind(
+          crypto.randomUUID(),
+          input.projectId,
+          input.itemId,
+          mention.contactId,
+          mention.field,
+          mention.startOffset,
+          mention.endOffset,
+        ),
+    );
+  }
+}
+
 export async function loadWorkspaceSnapshot(
   identity: IdentityUser,
 ): Promise<WorkspaceSnapshot> {
@@ -684,6 +765,38 @@ export async function loadWorkspaceSnapshot(
     user.id,
   );
 
+  const contactLinkRows = await all<{
+    project_id: string;
+    item_id: string;
+    contact_id: string;
+    manually_linked: number;
+  }>(
+    `SELECT wic.project_id,wic.item_id,wic.contact_id,wic.manually_linked
+     FROM work_item_contacts wic
+     JOIN project_members current ON current.project_id = wic.project_id
+     WHERE current.user_id = ?
+     ORDER BY wic.item_id,wic.contact_id`,
+    user.id,
+  );
+
+  const contactMentionRows = await all<{
+    id: string;
+    project_id: string;
+    item_id: string;
+    contact_id: string;
+    field: "title" | "description";
+    start_offset: number;
+    end_offset: number;
+  }>(
+    `SELECT wicm.id,wicm.project_id,wicm.item_id,wicm.contact_id,wicm.field,
+            wicm.start_offset,wicm.end_offset
+     FROM work_item_contact_mentions wicm
+     JOIN project_members current ON current.project_id = wicm.project_id
+     WHERE current.user_id = ?
+     ORDER BY wicm.item_id,wicm.field,wicm.start_offset,wicm.end_offset,wicm.id`,
+    user.id,
+  );
+
   const files = await all<{
     id: string;
     item_id: string;
@@ -785,6 +898,37 @@ export async function loadWorkspaceSnapshot(
     ]);
   }
 
+  const contactLinksByItem = new Map<string, WorkItemContactLinkRecord[]>();
+  for (const row of contactLinkRows) {
+    const value: WorkItemContactLinkRecord = {
+      contactId: row.contact_id,
+      manuallyLinked: Boolean(row.manually_linked),
+    };
+    contactLinksByItem.set(row.item_id, [
+      ...(contactLinksByItem.get(row.item_id) ?? []),
+      value,
+    ]);
+  }
+
+  const contactMentionsByItem = new Map<
+    string,
+    WorkItemContactMentionRecord[]
+  >();
+  for (const row of contactMentionRows) {
+    const value: WorkItemContactMentionRecord = {
+      id: row.id,
+      itemId: row.item_id,
+      contactId: row.contact_id,
+      field: row.field,
+      startOffset: row.start_offset,
+      endOffset: row.end_offset,
+    };
+    contactMentionsByItem.set(row.item_id, [
+      ...(contactMentionsByItem.get(row.item_id) ?? []),
+      value,
+    ]);
+  }
+
   const items: WorkItemRecord[] = itemRows.map((row) => {
     const payments = paymentMap.get(row.id) ?? [];
     const money = summarizeItemMoney(row.estimated_cost_minor, payments);
@@ -803,6 +947,8 @@ export async function loadWorkspaceSnapshot(
       updatedAt: row.updated_at,
       files: fileMap.get(row.id) ?? [],
       payments,
+      contactLinks: contactLinksByItem.get(row.id) ?? [],
+      contactMentions: contactMentionsByItem.get(row.id) ?? [],
     };
     if (row.type === "task") {
       return {
@@ -1093,39 +1239,73 @@ export async function applyWorkspaceMutation(
     case "create_item": {
       const projectId = await projectForCollection(mutation.collectionId);
       await requireProjectAccess(user.id, projectId);
+      const title = requireText(
+        mutation.title,
+        mutation.type === "task" ? "Task title" : "Event title",
+        160,
+      );
+      const description = optionalText(mutation.description);
       const estimate =
         mutation.estimatedCostMinor === null ||
         mutation.estimatedCostMinor === undefined
           ? null
           : validateMinorAmount(mutation.estimatedCostMinor);
+      const state = validateWorkItemContactState({
+        projectId,
+        title,
+        description,
+        manualContactIds: mutation.manualContactIds ?? [],
+        contactMentions: mutation.contactMentions ?? [],
+        contacts: await projectContactIdentities(projectId),
+      });
+      const itemId = crypto.randomUUID();
+      const db = getRawD1();
+      const statements: D1PreparedStatement[] = [];
       if (mutation.type === "task") {
-        await run(
-          `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
-           VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
-          crypto.randomUUID(),
-          projectId,
-          mutation.collectionId,
-          requireText(mutation.title, "Task title", 160),
-          optionalText(mutation.description),
-          validateTaskStatus(mutation.status),
-          validateOptionalIsoDate(mutation.dueDate, "Due date"),
-          estimate,
-          user.id,
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
+               VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
+            )
+            .bind(
+              itemId,
+              projectId,
+              mutation.collectionId,
+              title,
+              description,
+              validateTaskStatus(mutation.status),
+              validateOptionalIsoDate(mutation.dueDate, "Due date"),
+              estimate,
+              user.id,
+            ),
         );
       } else {
-        await run(
-          `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
-           VALUES (?,?,?,'event',?,?,NULL,NULL,?,?,?)`,
-          crypto.randomUUID(),
-          projectId,
-          mutation.collectionId,
-          requireText(mutation.title, "Event title", 160),
-          optionalText(mutation.description),
-          validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
-          estimate,
-          user.id,
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
+               VALUES (?,?,?,'event',?,?,NULL,NULL,?,?,?)`,
+            )
+            .bind(
+              itemId,
+              projectId,
+              mutation.collectionId,
+              title,
+              description,
+              validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
+              estimate,
+              user.id,
+            ),
         );
       }
+      appendContactStateStatements(statements, db, {
+        itemId,
+        projectId,
+        state,
+        replace: false,
+      });
+      await db.batch(statements);
       break;
     }
     case "update_item": {
@@ -1138,31 +1318,64 @@ export async function applyWorkspaceMutation(
       if (!existing || existing.type !== mutation.type) {
         throw new DomainError("Item type cannot be changed", "conflict");
       }
+      const title = requireText(
+        mutation.title,
+        mutation.type === "task" ? "Task title" : "Event title",
+        160,
+      );
+      const description = optionalText(mutation.description);
       const estimate =
         mutation.estimatedCostMinor === null ||
         mutation.estimatedCostMinor === undefined
           ? null
           : validateMinorAmount(mutation.estimatedCostMinor);
+      const state = validateWorkItemContactState({
+        projectId,
+        title,
+        description,
+        manualContactIds: mutation.manualContactIds ?? [],
+        contactMentions: mutation.contactMentions ?? [],
+        contacts: await projectContactIdentities(projectId),
+      });
+      const db = getRawD1();
+      const statements: D1PreparedStatement[] = [];
       if (mutation.type === "task") {
-        await run(
-          `UPDATE work_items SET title=?,description=?,status=?,due_date=?,occurrence_date=NULL,estimated_cost_minor=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-          requireText(mutation.title, "Task title", 160),
-          optionalText(mutation.description),
-          validateTaskStatus(mutation.status),
-          validateOptionalIsoDate(mutation.dueDate, "Due date"),
-          estimate,
-          mutation.itemId,
+        statements.push(
+          db
+            .prepare(
+              `UPDATE work_items SET title=?,description=?,status=?,due_date=?,occurrence_date=NULL,estimated_cost_minor=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+            )
+            .bind(
+              title,
+              description,
+              validateTaskStatus(mutation.status),
+              validateOptionalIsoDate(mutation.dueDate, "Due date"),
+              estimate,
+              mutation.itemId,
+            ),
         );
       } else {
-        await run(
-          `UPDATE work_items SET title=?,description=?,status=NULL,due_date=NULL,occurrence_date=?,estimated_cost_minor=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-          requireText(mutation.title, "Event title", 160),
-          optionalText(mutation.description),
-          validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
-          estimate,
-          mutation.itemId,
+        statements.push(
+          db
+            .prepare(
+              `UPDATE work_items SET title=?,description=?,status=NULL,due_date=NULL,occurrence_date=?,estimated_cost_minor=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+            )
+            .bind(
+              title,
+              description,
+              validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
+              estimate,
+              mutation.itemId,
+            ),
         );
       }
+      appendContactStateStatements(statements, db, {
+        itemId: mutation.itemId,
+        projectId,
+        state,
+        replace: true,
+      });
+      await db.batch(statements);
       break;
     }
     case "delete_item": {
@@ -1203,13 +1416,23 @@ export async function applyWorkspaceMutation(
         );
       }
       const taskId = crypto.randomUUID();
+      const title = requireText(mutation.title, "Task title", 160);
+      const description = optionalText(mutation.description);
       const estimate =
         mutation.estimatedCostMinor === null ||
         mutation.estimatedCostMinor === undefined
           ? null
           : validateMinorAmount(mutation.estimatedCostMinor);
+      const state = validateWorkItemContactState({
+        projectId: source.projectId,
+        title,
+        description,
+        manualContactIds: mutation.manualContactIds ?? [],
+        contactMentions: mutation.contactMentions ?? [],
+        contacts: await projectContactIdentities(source.projectId),
+      });
       const db = getRawD1();
-      await db.batch([
+      const statements: D1PreparedStatement[] = [
         db
           .prepare(
             `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
@@ -1219,8 +1442,8 @@ export async function applyWorkspaceMutation(
             taskId,
             source.projectId,
             mutation.collectionId,
-            requireText(mutation.title, "Task title", 160),
-            optionalText(mutation.description),
+            title,
+            description,
             validateTaskStatus(mutation.status),
             validateOptionalIsoDate(mutation.dueDate, "Due date"),
             estimate,
@@ -1238,7 +1461,14 @@ export async function applyWorkspaceMutation(
             taskId,
             user.id,
           ),
-      ]);
+      ];
+      appendContactStateStatements(statements, db, {
+        itemId: taskId,
+        projectId: source.projectId,
+        state,
+        replace: false,
+      });
+      await db.batch(statements);
       createdItemId = taskId;
       break;
     }

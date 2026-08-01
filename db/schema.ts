@@ -103,6 +103,10 @@ export const projectContacts = sqliteTable(
     ...timestamps,
   },
   (table) => [
+    uniqueIndex("project_contacts_id_project_unique").on(
+      table.id,
+      table.projectId,
+    ),
     index("project_contacts_project_name_idx").on(
       table.projectId,
       table.name,
@@ -185,6 +189,83 @@ export const workItems = sqliteTable(
       foreignColumns: [collections.id, collections.projectId],
       name: "work_items_collection_project_fk",
     }).onDelete("cascade"),
+  ],
+);
+
+export const workItemContacts = sqliteTable(
+  "work_item_contacts",
+  {
+    projectId: text("project_id").notNull(),
+    itemId: text("item_id").notNull(),
+    contactId: text("contact_id").notNull(),
+    manuallyLinked: integer("manually_linked", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => [
+    primaryKey({ columns: [table.itemId, table.contactId] }),
+    uniqueIndex("work_item_contacts_item_contact_project_unique").on(
+      table.itemId,
+      table.contactId,
+      table.projectId,
+    ),
+    index("work_item_contacts_contact_idx").on(
+      table.contactId,
+      table.itemId,
+    ),
+    foreignKey({
+      columns: [table.itemId, table.projectId],
+      foreignColumns: [workItems.id, workItems.projectId],
+      name: "work_item_contacts_item_project_fk",
+    }).onDelete("cascade"),
+    foreignKey({
+      columns: [table.contactId, table.projectId],
+      foreignColumns: [projectContacts.id, projectContacts.projectId],
+      name: "work_item_contacts_contact_project_fk",
+    }).onDelete("cascade"),
+  ],
+);
+
+export const workItemContactMentions = sqliteTable(
+  "work_item_contact_mentions",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id").notNull(),
+    itemId: text("item_id").notNull(),
+    contactId: text("contact_id").notNull(),
+    field: text("field").notNull(),
+    startOffset: integer("start_offset").notNull(),
+    endOffset: integer("end_offset").notNull(),
+  },
+  (table) => [
+    uniqueIndex("work_item_contact_mentions_range_unique").on(
+      table.itemId,
+      table.field,
+      table.startOffset,
+      table.endOffset,
+    ),
+    index("work_item_contact_mentions_item_idx").on(
+      table.itemId,
+      table.field,
+      table.startOffset,
+    ),
+    foreignKey({
+      columns: [table.itemId, table.contactId, table.projectId],
+      foreignColumns: [
+        workItemContacts.itemId,
+        workItemContacts.contactId,
+        workItemContacts.projectId,
+      ],
+      name: "work_item_contact_mentions_link_fk",
+    }).onDelete("cascade"),
+    check(
+      "work_item_contact_mentions_field_check",
+      sql`${table.field} IN ('title', 'description')`,
+    ),
+    check(
+      "work_item_contact_mentions_offsets_check",
+      sql`${table.startOffset} >= 0 AND ${table.endOffset} > ${table.startOffset}`,
+    ),
   ],
 );
 

@@ -8,9 +8,11 @@ import {
   validateOptionalIsoDate,
   validateRelationType,
   validateTaskStatus,
+  type ContactMentionField,
   type RelationType,
   type TaskStatus,
 } from "./domain.ts";
+import { validateWorkItemContactState } from "./work-item-contact-persistence.ts";
 import { validateArchiveUpload } from "./upload-policy.ts";
 
 export const PROJECT_ARCHIVE_FORMAT = "project-harbor-project" as const;
@@ -68,6 +70,20 @@ export type ProjectArchiveEvent = ProjectArchiveItemBase & {
 
 export type ProjectArchiveItem = ProjectArchiveTask | ProjectArchiveEvent;
 
+export type ProjectArchiveItemContact = {
+  itemId: string;
+  contactId: string;
+  manuallyLinked: boolean;
+};
+
+export type ProjectArchiveContactMention = {
+  itemId: string;
+  contactId: string;
+  field: ContactMentionField;
+  startOffset: number;
+  endOffset: number;
+};
+
 export type ProjectArchiveRelation = {
   id: string;
   sourceItemId: string;
@@ -124,6 +140,8 @@ export type ProjectArchiveManifestV1 = {
   contacts: ProjectArchiveContact[];
   collections: ProjectArchiveCollection[];
   items: ProjectArchiveItem[];
+  itemContacts: ProjectArchiveItemContact[];
+  contactMentions: ProjectArchiveContactMention[];
   relations: ProjectArchiveRelation[];
   payments: ProjectArchivePayment[];
   attachments: ProjectArchiveAttachment[];
@@ -328,6 +346,51 @@ function parseItem(input: unknown): ProjectArchiveItem {
   throw new DomainError("Item type must be task or event");
 }
 
+function parseItemContact(input: unknown): ProjectArchiveItemContact {
+  const value = asObject(input, "item contact");
+  rejectUnknown(value, ["itemId", "contactId", "manuallyLinked"]);
+  if (typeof value.manuallyLinked !== "boolean") {
+    throw new DomainError("Item contact manual state must be boolean");
+  }
+  return {
+    itemId: archiveId(value.itemId, "Item contact item"),
+    contactId: archiveId(value.contactId, "Item contact contact"),
+    manuallyLinked: value.manuallyLinked,
+  };
+}
+
+function parseContactMention(input: unknown): ProjectArchiveContactMention {
+  const value = asObject(input, "contact mention");
+  rejectUnknown(value, [
+    "itemId",
+    "contactId",
+    "field",
+    "startOffset",
+    "endOffset",
+  ]);
+  if (value.field !== "title" && value.field !== "description") {
+    throw new DomainError("Contact mention field must be title or description");
+  }
+  const startOffset = nonNegativeInteger(
+    value.startOffset,
+    "Contact mention start offset",
+  );
+  const endOffset = positiveInteger(
+    value.endOffset,
+    "Contact mention end offset",
+  );
+  if (endOffset <= startOffset) {
+    throw new DomainError("Contact mention range is invalid");
+  }
+  return {
+    itemId: archiveId(value.itemId, "Contact mention item"),
+    contactId: archiveId(value.contactId, "Contact mention contact"),
+    field: value.field,
+    startOffset,
+    endOffset,
+  };
+}
+
 function parseRelation(input: unknown): ProjectArchiveRelation {
   const value = asObject(input, "relationship");
   rejectUnknown(value, [
@@ -496,7 +559,6 @@ function validateReferences(manifest: ProjectArchiveManifestV1): void {
   const attachmentIds = uniqueIds("attachment", manifest.attachments);
   const receiptIds = uniqueIds("receipt", manifest.receipts);
   void relationIds;
-  void contactIds;
   void attachmentIds;
   void receiptIds;
 
@@ -506,6 +568,80 @@ function validateReferences(manifest: ProjectArchiveManifestV1): void {
     }
   }
   const itemById = new Map(manifest.items.map((item) => [item.id, item]));
+  const itemContactKeys = new Set<string>();
+  const linksByItem = new Map<string, ProjectArchiveItemContact[]>();
+  for (const link of manifest.itemContacts) {
+    if (!itemIds.has(link.itemId)) {
+      throw new DomainError("Item contact has an unknown item reference");
+    }
+    if (!contactIds.has(link.contactId)) {
+      throw new DomainError("Item contact has an unknown contact reference");
+    }
+    const key = `${link.itemId}\0${link.contactId}`;
+    if (itemContactKeys.has(key)) {
+      throw new DomainError("duplicate item contact");
+    }
+    itemContactKeys.add(key);
+    linksByItem.set(link.itemId, [
+      ...(linksByItem.get(link.itemId) ?? []),
+      link,
+    ]);
+  }
+
+  const mentionsByItem = new Map<string, ProjectArchiveContactMention[]>();
+  for (const mention of manifest.contactMentions) {
+    if (!itemIds.has(mention.itemId)) {
+      throw new DomainError("Contact mention has an unknown item reference");
+    }
+    if (!contactIds.has(mention.contactId)) {
+      throw new DomainError("Contact mention has an unknown contact reference");
+    }
+    if (!itemContactKeys.has(`${mention.itemId}\0${mention.contactId}`)) {
+      throw new DomainError("Contact mention has a missing item contact link");
+    }
+    mentionsByItem.set(mention.itemId, [
+      ...(mentionsByItem.get(mention.itemId) ?? []),
+      mention,
+    ]);
+  }
+
+  const archiveContacts = manifest.contacts.map((contact) => ({
+    id: contact.id,
+    projectId: "archive",
+    name: contact.name,
+    roleOrCompany: contact.roleOrCompany,
+  }));
+  for (const item of manifest.items) {
+    const archivedLinks = [...(linksByItem.get(item.id) ?? [])].sort((a, b) =>
+      a.contactId < b.contactId ? -1 : a.contactId > b.contactId ? 1 : 0,
+    );
+    const state = validateWorkItemContactState({
+      projectId: "archive",
+      title: item.title,
+      description: item.description,
+      manualContactIds: archivedLinks
+        .filter((link) => link.manuallyLinked)
+        .map((link) => link.contactId),
+      contactMentions: (mentionsByItem.get(item.id) ?? []).map(
+        ({ itemId: _itemId, ...mention }) => {
+          void _itemId;
+          return mention;
+        },
+      ),
+      contacts: archiveContacts,
+    });
+    if (
+      state.links.length !== archivedLinks.length ||
+      state.links.some(
+        (link, index) =>
+          link.contactId !== archivedLinks[index].contactId ||
+          link.manuallyLinked !== archivedLinks[index].manuallyLinked,
+      )
+    ) {
+      throw new DomainError("Archived item contact state is inconsistent");
+    }
+  }
+
   const relationMeanings = new Set<string>();
   for (const relation of manifest.relations) {
     const source = itemById.get(relation.sourceItemId);
@@ -582,6 +718,8 @@ export function parseProjectArchiveManifest(
     "contacts",
     "collections",
     "items",
+    "itemContacts",
+    "contactMentions",
     "relations",
     "payments",
     "attachments",
@@ -619,6 +757,16 @@ export function parseProjectArchiveManifest(
       parseCollection,
     ),
     items: asArray(value.items, "Items").map(parseItem),
+    itemContacts:
+      value.itemContacts === undefined
+        ? []
+        : asArray(value.itemContacts, "Item contacts").map(parseItemContact),
+    contactMentions:
+      value.contactMentions === undefined
+        ? []
+        : asArray(value.contactMentions, "Contact mentions").map(
+            parseContactMention,
+          ),
     relations: asArray(value.relations, "Relationships").map(parseRelation),
     payments: asArray(value.payments, "Payments").map(parsePayment),
     attachments,

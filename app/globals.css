@@ -1491,7 +1491,7 @@ strong.work-item-title {
   display: grid;
 }
 
-.collection-item-list > button {
+.collection-item-list > .collection-item {
   display: grid;
   min-height: 68px;
   grid-template-columns: auto minmax(0, 1fr) 16px;
@@ -1506,9 +1506,40 @@ strong.work-item-title {
   text-align: left;
 }
 
-.collection-item-list > button:hover {
+.collection-item-list > .collection-item:hover {
   background: rgba(255, 255, 255, 0.035);
   box-shadow: inset 3px 0 var(--cyan);
+}
+
+.work-item-open-surface {
+  position: relative;
+}
+
+.work-item-open-target {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.work-item-open-target:focus-visible {
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--cyan);
+  outline: none;
+}
+
+.work-item-open-surface > :not(.work-item-open-target) {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.work-item-open-surface .contact-action,
+.work-item-open-surface .contact-mention {
+  pointer-events: auto;
 }
 
 .event-mini-date {
@@ -1621,6 +1652,289 @@ strong.work-item-title {
   min-height: 44px;
   padding: 0 12px;
   font-size: 11px;
+}
+
+.contact-action {
+  position: relative;
+  display: inline;
+}
+
+.contact-mention-trigger {
+  display: inline;
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--cyan) 16%, transparent);
+  color: var(--cyan);
+  cursor: pointer;
+  padding: 1px 3px;
+  font: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  unicode-bidi: isolate;
+}
+
+.contact-mention-trigger:hover,
+.contact-mention-trigger:focus-visible,
+.contact-mention-trigger[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--cyan) 25%, transparent);
+  outline: none;
+}
+
+.contact-mention-trigger:focus-visible {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--cyan);
+}
+
+.contact-action-popover {
+  position: fixed;
+  z-index: 150;
+  display: grid;
+  width: max-content;
+  min-width: 190px;
+  max-width: min(300px, calc(100vw - 24px));
+  gap: 3px;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  padding: 10px;
+  text-align: start;
+}
+
+.contact-action-popover small {
+  margin-bottom: 5px;
+  color: var(--text-secondary);
+}
+
+.contact-action-popover a,
+.contact-action-popover button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 9px 10px;
+  text-align: start;
+  text-decoration: none;
+  font: inherit;
+}
+
+.contact-action-popover a:hover,
+.contact-action-popover a:focus-visible,
+.contact-action-popover button:hover,
+.contact-action-popover button:focus-visible {
+  background: var(--selected);
+  outline: none;
+}
+
+.contact-details-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.contact-details-modal > div:first-child,
+.contact-details-modal p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.contact-details-modal span,
+.contact-details-modal p > span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.contact-details-modal p > a {
+  width: fit-content;
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.contact-details-modal p > a:hover,
+.contact-details-modal p > a:focus-visible {
+  color: var(--seafoam);
+}
+
+.mention-editor {
+  position: relative;
+}
+
+.mention-editor-input,
+.mention-editor-preview {
+  width: 100%;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--shell);
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+  text-align: start;
+  white-space: pre-wrap;
+}
+
+.mention-editor-input[data-multiline="true"],
+.mention-editor-preview[data-multiline="true"] {
+  min-height: 104px;
+}
+
+.mention-editor-input[data-multiline="true"] {
+  resize: vertical;
+}
+
+.mention-editor-input:focus {
+  border-color: var(--seafoam);
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.12);
+}
+
+.mention-editor-preview {
+  position: relative;
+}
+
+.mention-editor-preview-edit-target {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: text;
+}
+
+.mention-editor-preview-edit-target:hover,
+.mention-editor-preview-edit-target:focus-visible {
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.12);
+  outline: 1px solid var(--seafoam);
+}
+
+.mention-editor-preview-content {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mention-editor-preview .contact-action {
+  pointer-events: auto;
+}
+
+.mention-picker {
+  position: fixed;
+  z-index: 140;
+  display: grid;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  border: 1px solid var(--border-bright);
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+
+.mention-picker button {
+  display: grid;
+  min-height: 48px;
+  gap: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  padding: 8px 10px;
+  text-align: start;
+}
+
+.mention-picker button bdi:last-child {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.mention-picker button:hover,
+.mention-picker button:focus-visible,
+.mention-picker button.active {
+  background: var(--selected);
+  outline: none;
+}
+
+.mention-picker-empty {
+  color: var(--text-secondary);
+  padding: 14px 10px;
+  text-align: center;
+}
+
+.work-item-contact-selector select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--shell);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+.contact-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.contact-chip {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border-bright);
+  border-radius: 999px;
+  background: var(--selected);
+  padding: 4px 5px 4px 10px;
+}
+
+.contact-chip-name {
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+  padding: 4px 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: inherit;
+  font-weight: 700;
+  unicode-bidi: isolate;
+}
+
+.contact-chip small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contact-chip-remove {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.contact-chip-remove:hover,
+.contact-chip-remove:focus-visible {
+  background: var(--card);
+  color: var(--text);
+  outline: none;
 }
 
 .member-grid {

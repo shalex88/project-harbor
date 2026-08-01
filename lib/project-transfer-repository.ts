@@ -10,7 +10,9 @@ import type {
   ProjectArchiveAttachment,
   ProjectArchiveCollection,
   ProjectArchiveContact,
+  ProjectArchiveContactMention,
   ProjectArchiveItem,
+  ProjectArchiveItemContact,
   ProjectArchiveManifestV1,
   ProjectArchivePayment,
   ProjectArchiveReceipt,
@@ -30,6 +32,8 @@ export type ProjectArchiveSource = {
   contacts: ProjectArchiveContact[];
   collections: ProjectArchiveCollection[];
   items: ProjectArchiveItem[];
+  itemContacts: ProjectArchiveItemContact[];
+  contactMentions: ProjectArchiveContactMention[];
   relations: ProjectArchiveRelation[];
   payments: ProjectArchivePayment[];
   attachments: ArchiveAttachmentSource[];
@@ -62,6 +66,8 @@ export type PlannedProjectImport = {
   relationIds: Map<string, string>;
   paymentIds: Map<string, string>;
   contactIds: Map<string, string>;
+  itemContacts: ProjectArchiveItemContact[];
+  contactMentions: ProjectArchiveContactMention[];
   relations: PlannedImportRelation[];
   payloads: PlannedImportPayload[];
 };
@@ -164,6 +170,31 @@ export async function loadProjectArchiveSource(
             wi.created_at,wi.updated_at
      FROM work_items wi JOIN users creator ON creator.id = wi.created_by
      WHERE wi.project_id = ? ORDER BY wi.created_at,wi.id`,
+    projectId,
+  );
+
+  const itemContactRows = await all<{
+    item_id: string;
+    contact_id: string;
+    manually_linked: number;
+  }>(
+    `SELECT wic.item_id,wic.contact_id,wic.manually_linked
+     FROM work_item_contacts wic WHERE wic.project_id = ?
+     ORDER BY wic.item_id,wic.contact_id`,
+    projectId,
+  );
+
+  const contactMentionRows = await all<{
+    item_id: string;
+    contact_id: string;
+    field: "title" | "description";
+    start_offset: number;
+    end_offset: number;
+  }>(
+    `SELECT wicm.item_id,wicm.contact_id,wicm.field,wicm.start_offset,
+            wicm.end_offset
+     FROM work_item_contact_mentions wicm WHERE wicm.project_id = ?
+     ORDER BY wicm.item_id,wicm.field,wicm.start_offset,wicm.end_offset,wicm.contact_id`,
     projectId,
   );
 
@@ -300,6 +331,18 @@ export async function loadProjectArchiveSource(
       updatedAt: archiveTimestamp(row.updated_at),
     })),
     items,
+    itemContacts: itemContactRows.map((row) => ({
+      itemId: row.item_id,
+      contactId: row.contact_id,
+      manuallyLinked: Boolean(row.manually_linked),
+    })),
+    contactMentions: contactMentionRows.map((row) => ({
+      itemId: row.item_id,
+      contactId: row.contact_id,
+      field: row.field,
+      startOffset: row.start_offset,
+      endOffset: row.end_offset,
+    })),
     relations: relationRows.map((row) => ({
       id: row.id,
       sourceItemId: row.source_item_id,
@@ -369,6 +412,18 @@ export function createImportIdPlan(
   const contactIds = new Map(
     manifest.contacts.map((contact) => [contact.id, crypto.randomUUID()]),
   );
+  const itemContacts = manifest.itemContacts.map((link) => ({
+    itemId: itemIds.get(link.itemId)!,
+    contactId: contactIds.get(link.contactId)!,
+    manuallyLinked: link.manuallyLinked,
+  }));
+  const contactMentions = manifest.contactMentions.map((mention) => ({
+    itemId: itemIds.get(mention.itemId)!,
+    contactId: contactIds.get(mention.contactId)!,
+    field: mention.field,
+    startOffset: mention.startOffset,
+    endOffset: mention.endOffset,
+  }));
   const relations = manifest.relations.map((relation) => {
     const endpoints = normalizeRelationEndpoints(
       relation.type,
@@ -415,6 +470,8 @@ export function createImportIdPlan(
     relationIds,
     paymentIds,
     contactIds,
+    itemContacts,
+    contactMentions,
     relations,
     payloads,
   };
@@ -521,6 +578,42 @@ export async function persistProjectImport(
           item.creatorLabel,
           item.createdAt,
           item.updatedAt,
+        ),
+    );
+  }
+
+  for (const link of plan.itemContacts) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO work_item_contacts
+           (project_id,item_id,contact_id,manually_linked) VALUES (?,?,?,?)`,
+        )
+        .bind(
+          projectId,
+          link.itemId,
+          link.contactId,
+          link.manuallyLinked ? 1 : 0,
+        ),
+    );
+  }
+
+  for (const mention of plan.contactMentions) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO work_item_contact_mentions
+           (id,project_id,item_id,contact_id,field,start_offset,end_offset)
+           VALUES (?,?,?,?,?,?,?)`,
+        )
+        .bind(
+          crypto.randomUUID(),
+          projectId,
+          mention.itemId,
+          mention.contactId,
+          mention.field,
+          mention.startOffset,
+          mention.endOffset,
         ),
     );
   }

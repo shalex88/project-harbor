@@ -5,10 +5,18 @@ import {
   formatMoney,
   moneyInputValue,
   parseMoneyToMinor,
+  type ContactMentionField,
   type PaymentRecord,
+  type WorkItemRecord,
   type WorkspaceMutation,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
+import {
+  normalizeMentionLabels,
+  removeContactMentions,
+  serializeMentionField,
+  type MentionEditorValue,
+} from "@/lib/work-item-contacts";
 import { cancelFileRename } from "@/lib/file-rename-editor";
 import { splitFilename } from "@/lib/file-renaming";
 import { buildUploadedFiles } from "@/lib/item-uploaded-files";
@@ -18,6 +26,8 @@ import {
 } from "@/lib/payment-receipt-actions";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
+import { ContactMentionEditor } from "./contact-mention-editor";
+import { WorkItemContactSelector } from "./work-item-contact-selector";
 
 export type ItemSheetMode =
   | { kind: "new"; type: "task" | "event"; collectionId: string }
@@ -26,6 +36,23 @@ export type ItemSheetMode =
   | null;
 
 type FileTarget = { itemId?: string; paymentId?: string };
+
+function valueForField(
+  item: WorkItemRecord | null,
+  field: ContactMentionField,
+): MentionEditorValue {
+  return {
+    text: item?.[field] ?? "",
+    mentions:
+      item?.contactMentions
+        .filter((mention) => mention.field === field)
+        .map((mention) => ({
+          contactId: mention.contactId,
+          startOffset: mention.startOffset,
+          endOffset: mention.endOffset,
+        })) ?? [],
+  };
+}
 
 export function ItemSheet({
   snapshot,
@@ -127,6 +154,25 @@ function ItemSheetContent({
   const collectionId = item?.collectionId ?? (mode.kind === "new" || mode.kind === "follow-up" ? mode.collectionId : "");
   const collection = snapshot.collections.find((candidate) => candidate.id === collectionId);
   const project = snapshot.projects.find((candidate) => candidate.id === (item?.projectId ?? sourceEvent?.projectId ?? collection?.projectId));
+  const projectContacts = snapshot.contacts.filter(
+    (contact) => contact.projectId === project?.id,
+  );
+  const [titleValue, setTitleValue] = useState<MentionEditorValue>(() =>
+    normalizeMentionLabels(valueForField(item, "title"), projectContacts),
+  );
+  const [descriptionValue, setDescriptionValue] = useState<MentionEditorValue>(
+    () =>
+      normalizeMentionLabels(
+        valueForField(item, "description"),
+        projectContacts,
+      ),
+  );
+  const [manualContactIds, setManualContactIds] = useState<string[]>(
+    () =>
+      item?.contactLinks
+        .filter((link) => link.manuallyLinked)
+        .map((link) => link.contactId) ?? [],
+  );
   const [tab, setTab] = useState<"details" | "files" | "payments" | "relations">("details");
   const [localError, setLocalError] = useState("");
   const [dragActive, setDragActive] = useState(false);
@@ -159,14 +205,24 @@ function ItemSheetContent({
         String(data.get("estimatedCost") ?? ""),
         currency,
       );
+      const title = serializeMentionField(titleValue, "title");
+      const description = serializeMentionField(
+        descriptionValue,
+        "description",
+      );
+      const contactFields = {
+        manualContactIds,
+        contactMentions: [...title.mentions, ...description.mentions],
+      };
       if (type === "task") {
         const common = {
           type: "task" as const,
-          title: String(data.get("title") ?? ""),
-          description: String(data.get("description") ?? ""),
+          title: title.text,
+          description: description.text,
           status: String(data.get("status") ?? "todo") as "todo" | "done",
           dueDate: String(data.get("dueDate") ?? "") || null,
           estimatedCostMinor: estimate,
+          ...contactFields,
         };
         if (mode.kind === "follow-up" && sourceEvent) {
           await onMutate({
@@ -178,6 +234,7 @@ function ItemSheetContent({
             status: common.status,
             dueDate: common.dueDate,
             estimatedCostMinor: common.estimatedCostMinor,
+            ...contactFields,
           });
         } else {
           await onMutate(
@@ -189,10 +246,11 @@ function ItemSheetContent({
       } else {
         const common = {
           type: "event" as const,
-          title: String(data.get("title") ?? ""),
-          description: String(data.get("description") ?? ""),
+          title: title.text,
+          description: description.text,
           occurrenceDate: String(data.get("occurrenceDate") ?? ""),
           estimatedCostMinor: estimate,
+          ...contactFields,
         };
         await onMutate(
           item
@@ -260,6 +318,19 @@ function ItemSheetContent({
           relation.sourceItemId === item.id || relation.targetItemId === item.id,
       )
     : [];
+  const mentionedContactIds = [
+    ...new Set(
+      [...titleValue.mentions, ...descriptionValue.mentions].map(
+        (mention) => mention.contactId,
+      ),
+    ),
+  ];
+
+  const removeLinkedContact = (contactId: string) => {
+    setManualContactIds((ids) => ids.filter((id) => id !== contactId));
+    setTitleValue((value) => removeContactMentions(value, contactId));
+    setDescriptionValue((value) => removeContactMentions(value, contactId));
+  };
 
   return (
     <div className="item-sheet-stack">
@@ -310,8 +381,29 @@ function ItemSheetContent({
               </select>
             </Field>
           ) : null}
-          <Field label="Title"><input name="title" defaultValue={item?.title ?? ""} required maxLength={160} /></Field>
-          <Field label="Description"><textarea name="description" defaultValue={item?.description ?? ""} maxLength={4000} /></Field>
+          <ContactMentionEditor
+            label="Title"
+            value={titleValue}
+            contacts={projectContacts}
+            multiline={false}
+            maxLength={160}
+            onChange={setTitleValue}
+          />
+          <ContactMentionEditor
+            label="Description"
+            value={descriptionValue}
+            contacts={projectContacts}
+            multiline={true}
+            maxLength={4000}
+            onChange={setDescriptionValue}
+          />
+          <WorkItemContactSelector
+            contacts={projectContacts}
+            manualContactIds={manualContactIds}
+            mentionedContactIds={mentionedContactIds}
+            onManualContactIdsChange={setManualContactIds}
+            onRemoveContact={removeLinkedContact}
+          />
           <div className="form-columns">
             {type === "task" ? (
               <>

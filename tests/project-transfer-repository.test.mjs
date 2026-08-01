@@ -43,7 +43,7 @@ function manifestFixture() {
         id: "task-z",
         collectionId: "collection-1",
         type: "task",
-        title: "First",
+        title: "Call @Architect",
         description: "",
         status: "todo",
         dueDate: null,
@@ -64,6 +64,18 @@ function manifestFixture() {
         creatorLabel: null,
         createdAt: "2026-07-02T10:00:00.000Z",
         updatedAt: "2026-07-02T10:00:00.000Z",
+      },
+    ],
+    itemContacts: [
+      { itemId: "task-z", contactId: "contact-1", manuallyLinked: false },
+    ],
+    contactMentions: [
+      {
+        itemId: "task-z",
+        contactId: "contact-1",
+        field: "title",
+        startOffset: 5,
+        endOffset: 15,
       },
     ],
     relations: [
@@ -132,6 +144,10 @@ test("archive export queries authorize first and remain project scoped", () => {
   assert.match(source, /fo\.project_id = \?/);
   assert.match(source, /FROM project_contacts pc/);
   assert.match(source, /WHERE pc\.project_id = \?/);
+  assert.match(source, /FROM work_item_contacts wic/);
+  assert.match(source, /WHERE wic\.project_id = \?/);
+  assert.match(source, /FROM work_item_contact_mentions wicm/);
+  assert.match(source, /WHERE wicm\.project_id = \?/);
   assert.doesNotMatch(source, /project_invitations/);
 });
 
@@ -147,6 +163,16 @@ test("fresh import plans remap every entity and payload reference", () => {
   assert.equal(plan.paymentIds.size, 1);
   assert.equal(plan.contactIds.size, 1);
   assert.notEqual(plan.contactIds.get("contact-1"), "contact-1");
+  assert.equal(plan.itemContacts[0].itemId, plan.itemIds.get("task-z"));
+  assert.equal(
+    plan.itemContacts[0].contactId,
+    plan.contactIds.get("contact-1"),
+  );
+  assert.equal(plan.contactMentions[0].itemId, plan.itemIds.get("task-z"));
+  assert.equal(
+    plan.contactMentions[0].contactId,
+    plan.contactIds.get("contact-1"),
+  );
   assert.equal(plan.payloads.length, 2);
 
   for (const item of manifest.items) {
@@ -206,6 +232,12 @@ test("import persistence maps attribution to labels and writes one D1 batch", ()
   assert.match(source, /uploaded_by.*ownerUserId/s);
   assert.match(source, /INSERT INTO project_contacts/);
   assert.match(source, /plan\.contactIds\.get\(contact\.id\)/);
+  assert.match(source, /INSERT INTO work_item_contacts/);
+  assert.match(source, /INSERT INTO work_item_contact_mentions/);
+  assert.ok(
+    source.indexOf("INSERT INTO work_item_contacts") <
+      source.indexOf("INSERT INTO work_item_contact_mentions"),
+  );
   assert.match(source, /db\.batch\(statements\)/);
   assert.doesNotMatch(source, /\binf\.pinned\b|attachment\.pinned/);
 });

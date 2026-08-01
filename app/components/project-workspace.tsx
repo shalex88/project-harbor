@@ -15,6 +15,7 @@ import { ContactGrid } from "./contact-directory";
 import { TaskStatusChip } from "./task-status-chip";
 import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
+import { WorkItemOpenSurface } from "./work-item-open-surface";
 
 type DialogState =
   | { kind: "project" }
@@ -220,10 +221,15 @@ export function ProjectWorkspace({
             </header>
             <div className="collection-item-list">
               {tasks.map((task) => (
-                <button type="button" key={task.id} onClick={() => onOpenItem(task.id)}>
+                <WorkItemOpenSurface
+                  className="collection-item"
+                  label={`Open task ${task.title}`}
+                  key={task.id}
+                  onOpen={() => onOpenItem(task.id)}
+                >
                   <TaskStatusChip status={task.status} />
                   <span className="row-title">
-                    <WorkItemTitle item={task} />
+                    <WorkItemTitle item={task} contacts={snapshot.contacts} />
                     <small>
                       {workItemMetadata(
                         [task.dueDate ? `Due ${task.dueDate}` : "No due date"],
@@ -234,7 +240,7 @@ export function ProjectWorkspace({
                     </small>
                   </span>
                   <span className="row-arrow" aria-hidden="true">›</span>
-                </button>
+                </WorkItemOpenSurface>
               ))}
               {!tasks.length ? <EmptyState title="No tasks here" description="Add actionable work to this collection." /> : null}
             </div>
@@ -246,10 +252,15 @@ export function ProjectWorkspace({
             </header>
             <div className="collection-item-list">
               {events.map((event) => (
-                <button type="button" key={event.id} onClick={() => onOpenItem(event.id)}>
+                <WorkItemOpenSurface
+                  className="collection-item"
+                  label={`Open event ${event.title}`}
+                  key={event.id}
+                  onOpen={() => onOpenItem(event.id)}
+                >
                   <span className="event-mini-date" aria-hidden="true">{event.occurrenceDate.slice(5)}</span>
                   <span className="row-title">
-                    <WorkItemTitle item={event} />
+                    <WorkItemTitle item={event} contacts={snapshot.contacts} />
                     <small>
                       {workItemMetadata(
                         [`Occurs ${event.occurrenceDate}`],
@@ -260,7 +271,7 @@ export function ProjectWorkspace({
                     </small>
                   </span>
                   <span className="row-arrow" aria-hidden="true">›</span>
-                </button>
+                </WorkItemOpenSurface>
               ))}
               {!events.length ? <EmptyState title="No events here" description="Add a dated occurrence that does not require action." /> : null}
             </div>

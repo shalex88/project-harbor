@@ -45,6 +45,8 @@ async function validArchive() {
           updatedAt: "2026-07-01T10:00:00.000Z",
         },
       ],
+      itemContacts: [],
+      contactMentions: [],
       relations: [],
       payments: [],
       attachments: [

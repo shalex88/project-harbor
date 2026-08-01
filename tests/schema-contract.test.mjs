@@ -55,6 +55,29 @@ test("project contacts are project scoped and cascade with their project", () =>
   assert.match(migration, /CREATE INDEX `project_contacts_project_name_idx`/);
 });
 
+test("work-item contacts and mention occurrences are project constrained", () => {
+  assert.match(migration, /CREATE TABLE `work_item_contacts`/);
+  assert.match(
+    migration,
+    /FOREIGN KEY \(`item_id`,`project_id`\) REFERENCES `work_items`\(`id`,`project_id`\)/,
+  );
+  assert.match(
+    migration,
+    /FOREIGN KEY \(`contact_id`,`project_id`\) REFERENCES `project_contacts`\(`id`,`project_id`\)/,
+  );
+  assert.match(migration, /CREATE TABLE `work_item_contact_mentions`/);
+  assert.match(
+    migration,
+    /FOREIGN KEY \(`item_id`,`contact_id`,`project_id`\) REFERENCES `work_item_contacts`\(`item_id`,`contact_id`,`project_id`\)/,
+  );
+  assert.match(migration, /work_item_contact_mentions_field_check/);
+  assert.match(migration, /work_item_contact_mentions_offsets_check/);
+  assert.match(
+    migration,
+    /CREATE UNIQUE INDEX `project_contacts_id_project_unique`[\s\S]*?PRAGMA optimize/,
+  );
+});
+
 test("task status migration maps in-progress rows before enforcing two states", () => {
   const twoStateMigration =
     migrationSources.find((source) =>

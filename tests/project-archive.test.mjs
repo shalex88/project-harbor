@@ -49,7 +49,7 @@ function validManifest() {
         id: "task-1",
         collectionId: "collection-1",
         type: "task",
-        title: "Approve plans",
+        title: "Approve @Architect plans",
         description: "",
         status: "todo",
         dueDate: "2026-08-01",
@@ -57,6 +57,18 @@ function validManifest() {
         creatorLabel: "Alex",
         createdAt: "2026-07-03T10:00:00.000Z",
         updatedAt: "2026-07-04T10:00:00.000Z",
+      },
+    ],
+    itemContacts: [
+      { itemId: "task-1", contactId: "contact-1", manuallyLinked: true },
+    ],
+    contactMentions: [
+      {
+        itemId: "task-1",
+        contactId: "contact-1",
+        field: "title",
+        startOffset: 8,
+        endOffset: 18,
       },
     ],
     relations: [],
@@ -96,14 +108,81 @@ test("parses a complete version-1 archive manifest", () => {
   assert.equal(manifest.project.currency, "ILS");
   assert.equal(manifest.contacts[0].name, "Dana Cohen");
   assert.equal(manifest.items[0].collectionId, "collection-1");
+  assert.deepEqual(manifest.itemContacts, [
+    { itemId: "task-1", contactId: "contact-1", manuallyLinked: true },
+  ]);
+  assert.equal(manifest.contactMentions[0].field, "title");
   assert.equal(manifest.attachments[0].path, "attachments/file-1");
 });
 
 test("accepts pre-contact version-1 archives with an empty contact list", () => {
   const legacy = validManifest();
   delete legacy.contacts;
+  delete legacy.itemContacts;
+  delete legacy.contactMentions;
   const parsed = parseProjectArchiveManifest(legacy);
   assert.deepEqual(parsed.contacts, []);
+  assert.deepEqual(parsed.itemContacts, []);
+  assert.deepEqual(parsed.contactMentions, []);
+});
+
+test("rejects invalid archived item contact links", () => {
+  const duplicate = validManifest();
+  duplicate.itemContacts.push({ ...duplicate.itemContacts[0] });
+  assert.throws(() => parseProjectArchiveManifest(duplicate), /duplicate item contact/i);
+
+  const unknownItem = validManifest();
+  unknownItem.itemContacts[0].itemId = "missing";
+  assert.throws(() => parseProjectArchiveManifest(unknownItem), /unknown item reference/i);
+
+  const unknownContact = validManifest();
+  unknownContact.itemContacts[0].contactId = "missing";
+  assert.throws(
+    () => parseProjectArchiveManifest(unknownContact),
+    /unknown contact reference/i,
+  );
+
+  const automaticWithoutMention = validManifest();
+  automaticWithoutMention.itemContacts[0].manuallyLinked = false;
+  automaticWithoutMention.contactMentions = [];
+  assert.throws(
+    () => parseProjectArchiveManifest(automaticWithoutMention),
+    /contact state/i,
+  );
+});
+
+test("rejects invalid archived contact mention ranges and references", () => {
+  const missingLink = validManifest();
+  missingLink.itemContacts = [];
+  assert.throws(() => parseProjectArchiveManifest(missingLink), /missing item contact link/i);
+
+  const overlap = validManifest();
+  overlap.contactMentions.push({
+    ...overlap.contactMentions[0],
+    startOffset: 9,
+    endOffset: 19,
+  });
+  assert.throws(() => parseProjectArchiveManifest(overlap), /must not overlap/i);
+
+  const negative = validManifest();
+  negative.contactMentions[0].startOffset = -1;
+  assert.throws(() => parseProjectArchiveManifest(negative), /non-negative integer/i);
+
+  const fractional = validManifest();
+  fractional.contactMentions[0].endOffset = 19.5;
+  assert.throws(() => parseProjectArchiveManifest(fractional), /positive integer/i);
+
+  const mismatch = validManifest();
+  mismatch.contactMentions[0].startOffset = 0;
+  mismatch.contactMentions[0].endOffset = 7;
+  assert.throws(() => parseProjectArchiveManifest(mismatch), /does not match/i);
+
+  const unknownContact = validManifest();
+  unknownContact.contactMentions[0].contactId = "missing";
+  assert.throws(
+    () => parseProjectArchiveManifest(unknownContact),
+    /unknown contact reference/i,
+  );
 });
 
 test("rejects invalid and duplicate archived contacts", () => {
