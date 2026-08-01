@@ -42,7 +42,7 @@ test("item create edit and follow-up paths serialize contact state", () => {
   );
   assert.match(itemSheet, /manualContactIds,/);
   assert.match(itemSheet, /contactMentions: \[\.\.\.title\.mentions, \.\.\.description\.mentions\]/);
-  assert.match(itemSheet, /action: "create_follow_up_task"[\s\S]*?\.\.\.contactFields/);
+  assert.match(itemSheet, /action: "create_follow_up_item"[\s\S]*?\.\.\.contactFields/);
   assert.match(itemSheet, /action: "update_item"[\s\S]*?\.\.\.common/);
   assert.match(itemSheet, /action: "create_item"[\s\S]*?\.\.\.common/);
 });

@@ -17,13 +17,17 @@ function mutationCase(action, nextAction) {
 test("item mutations validate contact state before one atomic batch", () => {
   const createItem = mutationCase("create_item", "update_item");
   const updateItem = mutationCase("update_item", "delete_item");
-  const followUp = mutationCase("create_follow_up_task", "create_relation");
+  const followUp = mutationCase("create_follow_up_item", "create_relation");
 
   for (const source of [createItem, updateItem, followUp]) {
     assert.match(source, /validateWorkItemContactState\(/);
     assert.match(source, /appendContactStateStatements\(/);
+  }
+  for (const source of [createItem, updateItem]) {
     assert.match(source, /await db\.batch\(statements\)/);
   }
+  assert.match(followUp, /await persistFollowUpItem\(/);
+  assert.match(followUp, /statements,\s*\);/);
 });
 
 test("contact statement helper replaces links before inserting complete state", () => {
