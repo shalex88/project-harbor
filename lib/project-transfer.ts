@@ -89,6 +89,7 @@ export function createProjectTransferService(
         version: 1,
         exportedAt: dependencies.now().toISOString(),
         project: source.project,
+        contacts: source.contacts,
         collections: source.collections,
         items: source.items,
         relations: source.relations,

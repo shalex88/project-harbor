@@ -9,6 +9,7 @@ import type { IdentityUser } from "./auth.ts";
 import type {
   ProjectArchiveAttachment,
   ProjectArchiveCollection,
+  ProjectArchiveContact,
   ProjectArchiveItem,
   ProjectArchiveManifestV1,
   ProjectArchivePayment,
@@ -26,6 +27,7 @@ type ArchiveReceiptSource = Omit<ProjectArchiveReceipt, "sha256"> & {
 
 export type ProjectArchiveSource = {
   project: ProjectArchiveManifestV1["project"];
+  contacts: ProjectArchiveContact[];
   collections: ProjectArchiveCollection[];
   items: ProjectArchiveItem[];
   relations: ProjectArchiveRelation[];
@@ -59,6 +61,7 @@ export type PlannedProjectImport = {
   itemIds: Map<string, string>;
   relationIds: Map<string, string>;
   paymentIds: Map<string, string>;
+  contactIds: Map<string, string>;
   relations: PlannedImportRelation[];
   payloads: PlannedImportPayload[];
 };
@@ -109,6 +112,23 @@ export async function loadProjectArchiveSource(
     projectId,
   );
   if (!project) throw new DomainError("Project not found", "not_found");
+
+  const contactRows = await all<{
+    id: string;
+    name: string;
+    role_or_company: string;
+    email: string;
+    phone: string;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+  }>(
+    `SELECT pc.id,pc.name,pc.role_or_company,pc.email,pc.phone,pc.notes,
+            pc.created_at,pc.updated_at
+     FROM project_contacts pc WHERE pc.project_id = ?
+     ORDER BY pc.name COLLATE NOCASE,pc.id`,
+    projectId,
+  );
 
   const collectionRows = await all<{
     id: string;
@@ -261,6 +281,16 @@ export async function loadProjectArchiveSource(
       description: project.description,
       currency: project.currency,
     },
+    contacts: contactRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      roleOrCompany: row.role_or_company,
+      email: row.email,
+      phone: row.phone,
+      notes: row.notes,
+      createdAt: archiveTimestamp(row.created_at),
+      updatedAt: archiveTimestamp(row.updated_at),
+    })),
     collections: collectionRows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -336,6 +366,9 @@ export function createImportIdPlan(
   const paymentIds = new Map(
     manifest.payments.map((payment) => [payment.id, crypto.randomUUID()]),
   );
+  const contactIds = new Map(
+    manifest.contacts.map((contact) => [contact.id, crypto.randomUUID()]),
+  );
   const relations = manifest.relations.map((relation) => {
     const endpoints = normalizeRelationEndpoints(
       relation.type,
@@ -381,6 +414,7 @@ export function createImportIdPlan(
     itemIds,
     relationIds,
     paymentIds,
+    contactIds,
     relations,
     payloads,
   };
@@ -418,6 +452,28 @@ export async function persistProjectImport(
       )
       .bind(projectId, ownerUserId),
   ];
+
+  for (const contact of manifest.contacts) {
+    statements.push(
+      db
+        .prepare(
+          `INSERT INTO project_contacts
+           (id,project_id,name,role_or_company,email,phone,notes,created_at,updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+        )
+        .bind(
+          plan.contactIds.get(contact.id)!,
+          projectId,
+          contact.name,
+          contact.roleOrCompany,
+          contact.email,
+          contact.phone,
+          contact.notes,
+          contact.createdAt,
+          contact.updatedAt,
+        ),
+    );
+  }
 
   for (const collection of manifest.collections) {
     statements.push(

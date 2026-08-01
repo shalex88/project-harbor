@@ -22,6 +22,18 @@ function validManifest() {
       description: "Coordinate the build.",
       currency: "ILS",
     },
+    contacts: [
+      {
+        id: "contact-1",
+        name: "Dana Cohen",
+        roleOrCompany: "Architect",
+        email: "dana@example.com",
+        phone: "+972 50 123 4567",
+        notes: "Planning lead",
+        createdAt: "2026-07-01T10:00:00.000Z",
+        updatedAt: "2026-07-02T10:00:00.000Z",
+      },
+    ],
     collections: [
       {
         id: "collection-1",
@@ -82,8 +94,39 @@ test("parses a complete version-1 archive manifest", () => {
   const manifest = parseProjectArchiveManifest(validManifest());
   assert.equal(manifest.format, "project-harbor-project");
   assert.equal(manifest.project.currency, "ILS");
+  assert.equal(manifest.contacts[0].name, "Dana Cohen");
   assert.equal(manifest.items[0].collectionId, "collection-1");
   assert.equal(manifest.attachments[0].path, "attachments/file-1");
+});
+
+test("accepts pre-contact version-1 archives with an empty contact list", () => {
+  const legacy = validManifest();
+  delete legacy.contacts;
+  const parsed = parseProjectArchiveManifest(legacy);
+  assert.deepEqual(parsed.contacts, []);
+});
+
+test("rejects invalid and duplicate archived contacts", () => {
+  const duplicate = validManifest();
+  duplicate.contacts.push({ ...duplicate.contacts[0] });
+  assert.throws(
+    () => parseProjectArchiveManifest(duplicate),
+    /duplicate contact id/i,
+  );
+
+  const unknown = validManifest();
+  unknown.contacts[0].secret = true;
+  assert.throws(
+    () => parseProjectArchiveManifest(unknown),
+    /unsupported field: secret/i,
+  );
+
+  const overlong = validManifest();
+  overlong.contacts[0].notes = "x".repeat(2_001);
+  assert.throws(
+    () => parseProjectArchiveManifest(overlong),
+    /Notes must be 2000 characters or less/,
+  );
 });
 
 test("accepts legacy pinned state without exposing it", () => {

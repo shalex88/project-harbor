@@ -33,6 +33,17 @@ export type ProjectArchiveCollection = {
   updatedAt: string;
 };
 
+export type ProjectArchiveContact = {
+  id: string;
+  name: string;
+  roleOrCompany: string;
+  email: string;
+  phone: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type ProjectArchiveItemBase = {
   id: string;
   collectionId: string;
@@ -110,6 +121,7 @@ export type ProjectArchiveManifestV1 = {
     description: string;
     currency: string;
   };
+  contacts: ProjectArchiveContact[];
   collections: ProjectArchiveCollection[];
   items: ProjectArchiveItem[];
   relations: ProjectArchiveRelation[];
@@ -241,6 +253,34 @@ function parseCollection(input: unknown): ProjectArchiveCollection {
     position: nonNegativeInteger(value.position, "Collection position"),
     createdAt: isoTimestamp(value.createdAt, "Collection creation time"),
     updatedAt: isoTimestamp(value.updatedAt, "Collection update time"),
+  };
+}
+
+function parseContact(input: unknown): ProjectArchiveContact {
+  const value = asObject(input, "contact");
+  rejectUnknown(value, [
+    "id",
+    "name",
+    "roleOrCompany",
+    "email",
+    "phone",
+    "notes",
+    "createdAt",
+    "updatedAt",
+  ]);
+  return {
+    id: archiveId(value.id, "Contact id"),
+    name: requireText(value.name, "Contact name", 160),
+    roleOrCompany: optionalText(
+      value.roleOrCompany,
+      160,
+      "Role or company",
+    ),
+    email: optionalText(value.email, 254, "Email"),
+    phone: optionalText(value.phone, 80, "Phone"),
+    notes: optionalText(value.notes, 2_000, "Notes"),
+    createdAt: isoTimestamp(value.createdAt, "Contact creation time"),
+    updatedAt: isoTimestamp(value.updatedAt, "Contact update time"),
   };
 }
 
@@ -448,6 +488,7 @@ function validateDirectedAcyclic(
 }
 
 function validateReferences(manifest: ProjectArchiveManifestV1): void {
+  const contactIds = uniqueIds("contact", manifest.contacts);
   const collectionIds = uniqueIds("collection", manifest.collections);
   const itemIds = uniqueIds("item", manifest.items);
   const relationIds = uniqueIds("relationship", manifest.relations);
@@ -455,6 +496,7 @@ function validateReferences(manifest: ProjectArchiveManifestV1): void {
   const attachmentIds = uniqueIds("attachment", manifest.attachments);
   const receiptIds = uniqueIds("receipt", manifest.receipts);
   void relationIds;
+  void contactIds;
   void attachmentIds;
   void receiptIds;
 
@@ -537,6 +579,7 @@ export function parseProjectArchiveManifest(
     "version",
     "exportedAt",
     "project",
+    "contacts",
     "collections",
     "items",
     "relations",
@@ -568,6 +611,10 @@ export function parseProjectArchiveManifest(
       description: optionalText(project.description, 1_000),
       currency: validateCurrency(project.currency),
     },
+    contacts:
+      value.contacts === undefined
+        ? []
+        : asArray(value.contacts, "Contacts").map(parseContact),
     collections: asArray(value.collections, "Collections").map(
       parseCollection,
     ),
