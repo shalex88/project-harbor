@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -26,6 +27,40 @@ const contactsPage = await readFile(
   new URL("../app/contacts/page.tsx", import.meta.url),
   "utf8",
 ).catch(() => "");
+
+function renderContactsWorkspace(selectedProjectId) {
+  const script = `
+    import React from "react";
+    import { renderToStaticMarkup } from "react-dom/server";
+    import { ContactsWorkspace } from "./app/components/contact-directory.tsx";
+
+    const noop = () => {};
+    const snapshot = {
+      projects: [
+        { id: "project-a", name: "House", description: "", currency: "ILS", ownerUserId: "user-1", role: "owner", createdAt: "2026-08-01", updatedAt: "2026-08-01" },
+        { id: "project-b", name: "Brand", description: "", currency: "USD", ownerUserId: "user-1", role: "owner", createdAt: "2026-08-01", updatedAt: "2026-08-01" },
+      ],
+      contacts: [
+        { id: "contact-a", projectId: "project-a", name: "Dana House", roleOrCompany: "Architect", email: "dana@example.com", phone: "", notes: "", createdAt: "2026-08-01", updatedAt: "2026-08-01" },
+      ],
+    };
+    process.stdout.write(renderToStaticMarkup(React.createElement(ContactsWorkspace, {
+      snapshot,
+      selectedProjectId: ${JSON.stringify(selectedProjectId)},
+      onSelectedProjectChange: noop,
+      onEdit: noop,
+      onDelete: noop,
+    })));
+  `;
+  return execFileSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+    },
+  );
+}
 
 test("shared contact cards expose project, communication, and management details", () => {
   assert.ok(directory.length > 0, "contact directory component must exist");
@@ -88,6 +123,23 @@ test("contacts has a first-class route and aggregate workspace", () => {
   assert.match(harborApp, /route === "contacts"/);
   assert.match(harborApp, /<ContactsWorkspace/);
   assert.match(harborApp, /segments\[0\] === "contacts"/);
+});
+
+test("contacts workspace renders a project selector and only the selected contacts", () => {
+  const html = renderContactsWorkspace("project-a");
+  assert.match(html, /aria-label="Filter contacts by project"/);
+  assert.match(html, /<option value="all">All projects<\/option>/);
+  assert.match(html, /<option value="project-a" selected="">House<\/option>/);
+  assert.match(html, />Dana House<\/h3>/);
+  assert.match(html, />House<\/span>/);
+  assert.doesNotMatch(html, />Brand<\/span>/);
+});
+
+test("a selected project without contacts renders the filtered empty state", () => {
+  const html = renderContactsWorkspace("project-b");
+  assert.match(html, />No contacts in this project<\/h3>/);
+  assert.match(html, />Add the first contact for this project\.<\/p>/);
+  assert.doesNotMatch(html, />Dana House<\/h3>/);
 });
 
 test("contact dialogs use fixed fields and strict mutations", () => {

@@ -15,6 +15,12 @@ import type {
   WorkspaceSnapshot,
 } from "@/lib/domain";
 import {
+  ALL_CONTACT_PROJECTS,
+  contactProjectFilterAfterNavigation,
+  contactProjectForCreate,
+  normalizeContactProjectFilter,
+} from "@/lib/contact-filter";
+import {
   renameUploadedFile,
   uploadFileInChunks,
 } from "@/lib/upload-client";
@@ -91,6 +97,9 @@ export function HarborApp({
   const [createLocation, setCreateLocation] = useState<CreateLocation>(null);
   const [contactDialog, setContactDialog] =
     useState<ContactDialogState>(null);
+  const [contactProjectFilterId, setContactProjectFilterId] = useState(
+    ALL_CONTACT_PROJECTS,
+  );
   const [pending, setPending] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
@@ -108,6 +117,9 @@ export function HarborApp({
     const restoreLocation = () => {
       const location = appLocation(window.location.pathname);
       setRoute(location.route);
+      setContactProjectFilterId((current) =>
+        contactProjectFilterAfterNavigation(current, location.route),
+      );
       if (location.projectId) {
         setActiveProjectId(location.projectId);
         setActiveCollectionId(
@@ -177,6 +189,9 @@ export function HarborApp({
 
   const acceptSnapshot = (next: WorkspaceSnapshot) => {
     setSnapshot(next);
+    setContactProjectFilterId((current) =>
+      normalizeContactProjectFilter(current, next.projects),
+    );
     const nextProjectId = next.projects.some(
       (project) => project.id === activeProjectId,
     )
@@ -293,6 +308,9 @@ export function HarborApp({
 
   const navigate = (nextRoute: AppRoute) => {
     setRoute(nextRoute);
+    setContactProjectFilterId((current) =>
+      contactProjectFilterAfterNavigation(current, nextRoute),
+    );
     window.history.pushState({}, "", routePath(nextRoute));
   };
 
@@ -405,7 +423,10 @@ export function HarborApp({
   };
 
   const openGlobalContactCreate = () => {
-    const projectId = snapshot.projects[0]?.id;
+    const projectId = contactProjectForCreate(
+      contactProjectFilterId,
+      snapshot.projects,
+    );
     if (!projectId) {
       pushToast("Create a project before adding contacts", "info");
       setNewProjectOpen(true);
@@ -539,6 +560,8 @@ export function HarborApp({
       return (
         <ContactsWorkspace
           snapshot={snapshot}
+          selectedProjectId={contactProjectFilterId}
+          onSelectedProjectChange={setContactProjectFilterId}
           onEdit={openContactEdit}
           onDelete={openContactDelete}
         />
@@ -570,7 +593,14 @@ export function HarborApp({
     return <OverviewDashboard {...dashboardProps} />;
     // Snapshot changes intentionally rebuild the composed route view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route, snapshot, activeProjectId, activeCollectionId, pending]);
+  }, [
+    route,
+    snapshot,
+    activeProjectId,
+    activeCollectionId,
+    contactProjectFilterId,
+    pending,
+  ]);
 
   const submitProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

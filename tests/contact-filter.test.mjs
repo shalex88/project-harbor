@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   ALL_CONTACT_PROJECTS,
+  contactProjectFilterAfterNavigation,
+  contactProjectForCreate,
   contactsForProject,
   normalizeContactProjectFilter,
 } from "../lib/contact-filter.ts";
@@ -30,4 +32,35 @@ test("removed project selections reset to all projects", () => {
   assert.equal(normalizeContactProjectFilter("project-a", projects), "project-a");
   assert.equal(normalizeContactProjectFilter("missing", projects), "all");
   assert.equal(normalizeContactProjectFilter("all", projects), "all");
+});
+
+test("contact creation defaults to the filtered project when it is valid", () => {
+  const projects = [{ id: "project-a" }, { id: "project-b" }];
+  assert.equal(
+    contactProjectForCreate("project-b", projects),
+    "project-b",
+  );
+  assert.equal(
+    contactProjectForCreate(ALL_CONTACT_PROJECTS, projects),
+    "project-a",
+  );
+  assert.equal(
+    contactProjectForCreate("removed", projects),
+    "project-a",
+  );
+  assert.equal(
+    contactProjectForCreate(ALL_CONTACT_PROJECTS, []),
+    undefined,
+  );
+});
+
+test("entering Contacts resets the project filter without affecting other routes", () => {
+  assert.equal(
+    contactProjectFilterAfterNavigation("project-b", "contacts"),
+    ALL_CONTACT_PROJECTS,
+  );
+  assert.equal(
+    contactProjectFilterAfterNavigation("project-b", "tasks"),
+    "project-b",
+  );
 });

@@ -5,12 +5,17 @@ import type {
   ProjectRecord,
   WorkspaceSnapshot,
 } from "@/lib/domain";
+import {
+  ALL_CONTACT_PROJECTS,
+  contactsForProject,
+} from "@/lib/contact-filter";
 import { EmptyState } from "./ui";
 
 export function ContactGrid({
   contacts,
   projects,
   showProject = false,
+  emptyTitle = "No contacts yet",
   emptyDescription = "Add the people relevant to this project.",
   onEdit,
   onDelete,
@@ -18,6 +23,7 @@ export function ContactGrid({
   contacts: ContactRecord[];
   projects: ProjectRecord[];
   showProject?: boolean;
+  emptyTitle?: string;
   emptyDescription?: string;
   onEdit: (contact: ContactRecord) => void;
   onDelete: (contact: ContactRecord) => void;
@@ -28,7 +34,7 @@ export function ContactGrid({
 
   if (!contacts.length) {
     return (
-      <EmptyState title="No contacts yet" description={emptyDescription} />
+      <EmptyState title={emptyTitle} description={emptyDescription} />
     );
   }
 
@@ -90,20 +96,51 @@ export function ContactGrid({
 
 export function ContactsWorkspace({
   snapshot,
+  selectedProjectId,
+  onSelectedProjectChange,
   onEdit,
   onDelete,
 }: {
   snapshot: WorkspaceSnapshot;
+  selectedProjectId: string;
+  onSelectedProjectChange: (projectId: string) => void;
   onEdit: (contact: ContactRecord) => void;
   onDelete: (contact: ContactRecord) => void;
 }) {
+  const contacts = contactsForProject(snapshot.contacts, selectedProjectId);
+  const filtered = selectedProjectId !== ALL_CONTACT_PROJECTS;
+
   return (
     <section className="contacts-workspace" aria-label="All project contacts">
+      <div className="contact-filter-bar" aria-label="Contact filters">
+        <label className="contact-project-filter">
+          <span>Project</span>
+          <select
+            aria-label="Filter contacts by project"
+            value={selectedProjectId}
+            onChange={(event) =>
+              onSelectedProjectChange(event.target.value)
+            }
+          >
+            <option value={ALL_CONTACT_PROJECTS}>All projects</option>
+            {snapshot.projects.map((project) => (
+              <option value={project.id} key={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       <ContactGrid
-        contacts={snapshot.contacts}
+        contacts={contacts}
         projects={snapshot.projects}
         showProject
-        emptyDescription="Add a contact to any project to build your workspace directory."
+        emptyTitle={filtered ? "No contacts in this project" : "No contacts yet"}
+        emptyDescription={
+          filtered
+            ? "Add the first contact for this project."
+            : "Add a contact to any project to build your workspace directory."
+        }
         onEdit={onEdit}
         onDelete={onDelete}
       />
