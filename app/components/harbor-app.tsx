@@ -37,6 +37,7 @@ import {
   headerActionsForRoute,
   type HeaderActionKind,
 } from "./header-actions";
+import { followUpCreatedItemMode } from "./follow-up-result";
 import { ItemSheet, type ItemSheetMode } from "./item-sheet";
 import { shouldLeaveDeletedProjectRoute } from "./project-delete-navigation";
 import { ProjectWorkspace } from "./project-workspace";
@@ -229,12 +230,11 @@ export function HarborApp({
         }),
       );
       acceptSnapshot(result.snapshot);
-      if (
-        mutation.action === "create_follow_up_item" &&
-        result.createdItemId
-      ) {
-        setItemMode({ kind: "existing", itemId: result.createdItemId });
-      }
+      const createdItemMode = followUpCreatedItemMode(
+        mutation.action,
+        result.createdItemId,
+      );
+      if (createdItemMode) setItemMode(createdItemMode);
       pushToast(successMessage(mutation));
       return result.snapshot;
     } catch (error) {

@@ -2,29 +2,50 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
+import { followUpCreatedItemMode } from "../app/components/follow-up-result.ts";
+
 function runInteractionScript(body) {
   const script = String.raw`
-    import React, { act } from "react";
-    import { createRoot } from "react-dom/client";
     import { JSDOM } from "jsdom";
-    import { FollowUpMenu } from "./app/components/follow-up-menu.tsx";
-    import { ItemSheet } from "./app/components/item-sheet.tsx";
 
     const dom = new JSDOM("<!doctype html><html><body><div id='root'></div><button id='outside'>Outside</button></body></html>", { url: "http://localhost" });
     globalThis.window = dom.window;
     globalThis.document = dom.window.document;
     globalThis.Node = dom.window.Node;
     globalThis.HTMLElement = dom.window.HTMLElement;
+    globalThis.HTMLInputElement = dom.window.HTMLInputElement;
+    globalThis.HTMLSelectElement = dom.window.HTMLSelectElement;
+    globalThis.HTMLTextAreaElement = dom.window.HTMLTextAreaElement;
+    globalThis.Event = dom.window.Event;
+    globalThis.FormData = dom.window.FormData;
     globalThis.KeyboardEvent = dom.window.KeyboardEvent;
     globalThis.PointerEvent = dom.window.PointerEvent ?? dom.window.MouseEvent;
     globalThis.MouseEvent = dom.window.MouseEvent;
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
     globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle);
+    const ReactModule = await import("react");
+    const React = ReactModule.default;
+    const { act } = ReactModule;
+    const { createRoot } = await import("react-dom/client");
+    const { FollowUpMenu } = await import("./app/components/follow-up-menu.tsx");
+    const { ItemSheet } = await import("./app/components/item-sheet.tsx");
     const flush = () => new Promise((resolve) => setTimeout(resolve, 5));
     const click = async (element) => {
       await act(async () => {
         element.click();
+        await flush();
+      });
+    };
+    const changeValue = async (element, value) => {
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(element),
+          "value",
+        ).set;
+        setter.call(element, value);
+        element.dispatchEvent(new Event("change", { bubbles: true }));
+        element.dispatchEvent(new Event("input", { bubbles: true }));
         await flush();
       });
     };
@@ -176,4 +197,104 @@ test("task and event sheets dispatch every follow-up destination from the render
     { sourceItemId: "event-source", collectionId: "collection-1", type: "task" },
     { sourceItemId: "event-source", collectionId: "collection-1", type: "event" },
   ]);
+});
+
+test("rendered follow-up forms submit destination fields and contact state", () => {
+  const result = runInteractionScript(String.raw`
+    const mutations = [];
+    const baseItem = {
+      projectId: "project-1", collectionId: "collection-1",
+      title: "Source", description: "", estimatedCostMinor: null,
+      actualSpendMinor: 0, varianceMinor: null,
+      createdBy: "user-1", createdByName: "Alex",
+      createdAt: "2026-08-01", updatedAt: "2026-08-01",
+      files: [], payments: [], contactLinks: [], contactMentions: [],
+    };
+    const snapshot = {
+      user: { id: "user-1", email: "alex@example.com", displayName: "Alex" },
+      projects: [{ id: "project-1", ownerUserId: "user-1", name: "Project", description: "", currency: "USD", role: "owner", createdAt: "", updatedAt: "" }],
+      members: [], invitations: [],
+      contacts: [{ id: "contact-1", projectId: "project-1", name: "Dana", roleOrCompany: "Partner", email: "", phone: "", notes: "", createdAt: "", updatedAt: "" }],
+      collections: [{ id: "collection-1", projectId: "project-1", name: "General", color: "cyan", position: 0, createdAt: "", updatedAt: "" }],
+      items: [
+        { ...baseItem, id: "task-source", type: "task", status: "todo", dueDate: null, occurrenceDate: null },
+        { ...baseItem, id: "event-source", type: "event", status: null, dueDate: null, occurrenceDate: "2026-08-01" },
+      ],
+      relations: [], generatedAt: "2026-08-01",
+    };
+    const root = createRoot(document.querySelector("#root"));
+    const cases = [
+      { sourceItemId: "event-source", type: "task", title: "Follow-up task", dateName: "dueDate", date: "2026-08-20" },
+      { sourceItemId: "task-source", type: "event", title: "Follow-up event", dateName: "occurrenceDate", date: "2026-08-21" },
+    ];
+
+    for (const entry of cases) {
+      await act(async () => {
+        root.render(React.createElement(ItemSheet, {
+          snapshot,
+          mode: { kind: "follow-up", sourceItemId: entry.sourceItemId, type: entry.type, collectionId: "collection-1" },
+          pending: false,
+          uploadProgress: null,
+          onClose() {},
+          async onMutate(mutation) { mutations.push(mutation); return snapshot; },
+          onOpenItem() {}, onStartFollowUp() {},
+          async onUpload() {}, async onRenameFile() {}, async onDeleteFile() {},
+        }));
+        await flush();
+      });
+      const collection = document.querySelector("select[name='collectionId']");
+      if (collection.value !== "collection-1") throw new Error("source collection was not selected");
+      await changeValue(document.querySelector("[aria-label='Title']"), entry.title);
+      await changeValue(document.querySelector("#work-item-contact-select"), "contact-1");
+      await changeValue(
+        document.querySelector("[name='" + entry.dateName + "']"),
+        entry.date,
+      );
+      await click(
+        [...document.querySelectorAll("button")].find(
+          (button) => button.textContent === "Create " + entry.type,
+        ),
+      );
+    }
+
+    process.stdout.write(JSON.stringify(mutations));
+    root.unmount();
+  `);
+
+  assert.deepEqual(result, [
+    {
+      action: "create_follow_up_item",
+      sourceItemId: "event-source",
+      collectionId: "collection-1",
+      type: "task",
+      title: "Follow-up task",
+      description: "",
+      status: "todo",
+      dueDate: "2026-08-20",
+      estimatedCostMinor: null,
+      manualContactIds: ["contact-1"],
+      contactMentions: [],
+    },
+    {
+      action: "create_follow_up_item",
+      sourceItemId: "task-source",
+      collectionId: "collection-1",
+      type: "event",
+      title: "Follow-up event",
+      description: "",
+      occurrenceDate: "2026-08-21",
+      estimatedCostMinor: null,
+      manualContactIds: ["contact-1"],
+      contactMentions: [],
+    },
+  ]);
+});
+
+test("created follow-up results open the returned item", () => {
+  assert.deepEqual(
+    followUpCreatedItemMode("create_follow_up_item", "created-item"),
+    { kind: "existing", itemId: "created-item" },
+  );
+  assert.equal(followUpCreatedItemMode("create_item", "created-item"), null);
+  assert.equal(followUpCreatedItemMode("create_follow_up_item", null), null);
 });

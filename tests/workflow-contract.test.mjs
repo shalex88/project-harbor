@@ -91,6 +91,7 @@ test("tasks and events create task or event follow-ups from one menu", () => {
   assert.match(itemSource, /Follows from/);
   assert.match(itemSource, /kind: "follow-up"/);
   assert.match(harborSource, /result\.createdItemId/);
+  assert.match(harborSource, /followUpCreatedItemMode\(/);
   assert.doesNotMatch(
     itemSource,
     /item\.type === "event" \? \([\s\S]{0,500}<FollowUpMenu/,
