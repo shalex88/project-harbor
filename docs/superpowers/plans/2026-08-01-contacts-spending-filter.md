@@ -4,7 +4,7 @@
 
 **Goal:** Make the Contacts project selector use the same compact visual treatment as Spending without changing its behavior.
 
-**Architecture:** Reuse the existing `filter-bar`, `filter-control`, and `sr-only` presentation contract already used by Spending. Keep `ContactsWorkspace` controlled by the same props and remove only the now-redundant Contacts-specific filter CSS.
+**Architecture:** Reuse the existing `dashboard-stack`, `filter-bar`, `filter-control`, and `sr-only` presentation contract already used by Spending. Keep `ContactsWorkspace` controlled by the same props and remove only the now-redundant Contacts-specific filter CSS.
 
 **Tech Stack:** React 19, TypeScript, CSS, Node test runner, React server rendering
 
@@ -14,6 +14,7 @@
 - Keep `aria-label="Filter contacts by project"` on the select.
 - Do not extract or refactor the Spending dashboard components.
 - Use the existing responsive rules for `filter-bar` and `filter-control`.
+- Use `dashboard-stack` on the Contacts region so filter-to-content spacing matches Spending.
 
 ---
 
@@ -35,6 +36,10 @@ Add these assertions to `contacts workspace renders a project selector and only 
 ```js
 assert.match(
   html,
+  /^<section class="contacts-workspace dashboard-stack" aria-label="Contacts">/,
+);
+assert.match(
+  html,
   /<div class="filter-bar" aria-label="Contact filters"><label class="filter-control"><span class="sr-only">Filter contacts by project<\/span>/,
 );
 ```
@@ -48,13 +53,14 @@ export PATH=/home/shalex/.nvm/versions/node/v24.15.0/bin:$PATH
 node --experimental-strip-types --test tests/contact-ui.test.mjs
 ```
 
-Expected: FAIL because Contacts still renders `contact-filter-bar`, `contact-project-filter`, and a visible `Project` label.
+Expected: FAIL because Contacts still renders `contact-filter-bar`, `contact-project-filter`, a visible `Project` label, and lacks the shared `dashboard-stack` spacing.
 
 - [ ] **Step 3: Replace the Contacts-only filter presentation**
 
 Change the filter markup in `app/components/contact-directory.tsx` to:
 
 ```tsx
+<section className="contacts-workspace dashboard-stack" aria-label="Contacts">
 <div className="filter-bar" aria-label="Contact filters">
   <label className="filter-control">
     <span className="sr-only">Filter contacts by project</span>
@@ -72,6 +78,7 @@ Change the filter markup in `app/components/contact-directory.tsx` to:
     </select>
   </label>
 </div>
+</section>
 ```
 
 Delete the `.contact-filter-bar`, `.contact-project-filter`, `.contact-project-filter select`, and `.contact-project-filter select:focus` rules from `app/globals.css`. Do not alter the shared `.filter-bar` or `.filter-control` rules.

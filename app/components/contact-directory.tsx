@@ -111,10 +111,10 @@ export function ContactsWorkspace({
   const filtered = selectedProjectId !== ALL_CONTACT_PROJECTS;
 
   return (
-    <section className="contacts-workspace" aria-label="Contacts">
-      <div className="contact-filter-bar" aria-label="Contact filters">
-        <label className="contact-project-filter">
-          <span>Project</span>
+    <section className="contacts-workspace dashboard-stack" aria-label="Contacts">
+      <div className="filter-bar" aria-label="Contact filters">
+        <label className="filter-control">
+          <span className="sr-only">Filter contacts by project</span>
           <select
             aria-label="Filter contacts by project"
             value={selectedProjectId}

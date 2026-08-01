@@ -127,7 +127,14 @@ test("contacts has a first-class route and aggregate workspace", () => {
 
 test("contacts workspace renders a project selector and only the selected contacts", () => {
   const html = renderContactsWorkspace("project-a");
-  assert.match(html, /^<section class="contacts-workspace" aria-label="Contacts">/);
+  assert.match(
+    html,
+    /^<section class="contacts-workspace dashboard-stack" aria-label="Contacts">/,
+  );
+  assert.match(
+    html,
+    /<div class="filter-bar" aria-label="Contact filters"><label class="filter-control"><span class="sr-only">Filter contacts by project<\/span>/,
+  );
   assert.match(html, /aria-label="Filter contacts by project"/);
   assert.match(html, /<option value="all">All projects<\/option>/);
   assert.match(html, /<option value="project-a" selected="">House<\/option>/);

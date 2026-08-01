@@ -17,10 +17,11 @@ Make the project filter in the Contacts workspace look and behave visually like 
 - The filter container uses `filter-bar`.
 - The label uses `filter-control`.
 - The text label becomes screen-reader-only.
+- The Contacts region also uses `dashboard-stack` so the filter-to-content spacing matches Spending.
 - The select retains `aria-label="Filter contacts by project"`.
 - The option list, controlled value, filtering, empty state, creation default, and navigation-reset behavior remain unchanged.
 
-The Contacts-only filter classes will be removed because the shared Spending classes replace them. Existing responsive rules for `filter-bar` and `filter-control` will apply on mobile.
+The Contacts-only filter classes will be removed because the shared Spending classes replace them. Existing responsive rules for `dashboard-stack`, `filter-bar`, and `filter-control` will apply on mobile.
 
 ## Verification
 

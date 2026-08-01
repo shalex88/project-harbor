@@ -1533,35 +1533,6 @@ strong.work-item-title {
   padding-top: 24px;
 }
 
-.contact-filter-bar {
-  display: flex;
-  margin-bottom: 16px;
-}
-
-.contact-project-filter {
-  display: grid;
-  width: min(280px, 100%);
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.contact-project-filter select {
-  width: 100%;
-  min-height: 44px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  outline: 0;
-  background: var(--shell);
-  color: var(--text-secondary);
-  padding: 0 34px 0 12px;
-}
-
-.contact-project-filter select:focus {
-  border-color: var(--seafoam);
-}
-
 .contact-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
