@@ -60,6 +60,14 @@ test("contact actions are conditional, dismissible, and read only", () => {
   assert.match(actionsSource, /document\.addEventListener\("pointerdown"/);
   assert.match(actionsSource, /document\.removeEventListener\("pointerdown"/);
   assert.match(actionsSource, /triggerRef\.current\?\.focus\(\)/);
+  assert.match(actionsSource, /focusMenuItem/);
+  assert.match(actionsSource, /event\.key === "ArrowDown"/);
+  assert.match(actionsSource, /event\.key === "ArrowUp"/);
+  assert.match(actionsSource, /event\.key === "Home"/);
+  assert.match(actionsSource, /event\.key === "End"/);
+  assert.match(actionsSource, /focusAdjacentControl\(event\.shiftKey\)/);
+  assert.match(actionsSource, /\[contenteditable='true'\]/);
+  assert.match(actionsSource, /control\.tabIndex >= 0/);
   assert.match(actionsSource, /contact\.phone \? \(/);
   assert.match(actionsSource, /href=\{`tel:\$\{contact\.phone\}`\}/);
   assert.match(actionsSource, /contact\.email \? \(/);

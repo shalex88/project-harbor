@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
   useState,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
   type ReactElement,
   type ReactNode,
@@ -98,11 +100,58 @@ export function ContactActionTrigger({
   const containerRef = useRef<HTMLSpanElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLSpanElement>(null);
+  const pendingMenuFocus = useRef<"first" | "last">("first");
   const menuId = useId();
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
 
   const restoreTriggerFocus = () => {
     requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const menuItems = useCallback(
+    (): HTMLElement[] =>
+      menuRef.current
+        ? [
+            ...menuRef.current.querySelectorAll<HTMLElement>(
+              "[role='menuitem']",
+            ),
+          ]
+        : [],
+    [],
+  );
+
+  const focusMenuItem = useCallback(
+    (index: number) => {
+      const items = menuItems();
+      if (!items.length) return;
+      items[(index + items.length) % items.length]?.focus();
+    },
+    [menuItems],
+  );
+
+  const focusAdjacentControl = (backward: boolean) => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const scope = trigger.closest<HTMLElement>("[role='dialog']") ?? document;
+    const controls = [
+      ...scope.querySelectorAll<HTMLElement>(
+        "button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[contenteditable='true'],[tabindex]",
+      ),
+    ].filter(
+      (control) =>
+        control.tabIndex >= 0 &&
+        !menuRef.current?.contains(control) &&
+        control.getClientRects().length > 0,
+    );
+    const triggerIndex = controls.indexOf(trigger);
+    if (triggerIndex < 0 || controls.length < 2) {
+      restoreTriggerFocus();
+      return;
+    }
+    const nextIndex =
+      (triggerIndex + (backward ? -1 : 1) + controls.length) %
+      controls.length;
+    requestAnimationFrame(() => controls[nextIndex]?.focus());
   };
 
   useEffect(() => {
@@ -127,7 +176,11 @@ export function ContactActionTrigger({
           : Math.max(margin, above);
       setMenuPosition({ top, left });
     };
-    const frame = requestAnimationFrame(positionMenu);
+    const frame = requestAnimationFrame(() => {
+      positionMenu();
+      const items = menuItems();
+      focusMenuItem(pendingMenuFocus.current === "last" ? items.length - 1 : 0);
+    });
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node;
       if (
@@ -155,10 +208,32 @@ export function ContactActionTrigger({
       window.removeEventListener("resize", positionMenu);
       window.removeEventListener("scroll", positionMenu, true);
     };
-  }, [menuOpen]);
+  }, [focusMenuItem, menuItems, menuOpen]);
 
   const stopRowActivation = (event: MouseEvent<HTMLElement>) => {
     event.stopPropagation();
+  };
+
+  const handleMenuKeyDown = (event: ReactKeyboardEvent<HTMLElement>) => {
+    const items = menuItems();
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusMenuItem(currentIndex + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusMenuItem(currentIndex - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusMenuItem(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusMenuItem(items.length - 1);
+    } else if (event.key === "Tab") {
+      event.preventDefault();
+      setMenuOpen(false);
+      focusAdjacentControl(event.shiftKey);
+    }
   };
 
   return (
@@ -170,9 +245,19 @@ export function ContactActionTrigger({
         aria-haspopup="menu"
         aria-expanded={menuOpen}
         aria-controls={menuOpen ? menuId : undefined}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            event.stopPropagation();
+            pendingMenuFocus.current =
+              event.key === "ArrowUp" ? "last" : "first";
+            setMenuOpen(true);
+          }
+        }}
         onClick={(event) => {
           event.preventDefault();
           event.stopPropagation();
+          pendingMenuFocus.current = "first";
           setMenuOpen((current) => !current);
         }}
       >
@@ -187,6 +272,7 @@ export function ContactActionTrigger({
           aria-label={`Contact actions for ${contact.name}`}
           style={{ top: menuPosition.top, left: menuPosition.left }}
           onClick={stopRowActivation}
+          onKeyDown={handleMenuKeyDown}
         >
           <strong>
             <bdi dir="auto">{contact.name}</bdi>
@@ -197,18 +283,35 @@ export function ContactActionTrigger({
             </small>
           ) : null}
           {contact.phone ? (
-            <a role="menuitem" href={`tel:${contact.phone}`} onClick={stopRowActivation}>
+            <a
+              role="menuitem"
+              tabIndex={-1}
+              href={`tel:${contact.phone}`}
+              onClick={(event) => {
+                stopRowActivation(event);
+                setMenuOpen(false);
+              }}
+            >
               Call
             </a>
           ) : null}
           {contact.email ? (
-            <a role="menuitem" href={`mailto:${contact.email}`} onClick={stopRowActivation}>
+            <a
+              role="menuitem"
+              tabIndex={-1}
+              href={`mailto:${contact.email}`}
+              onClick={(event) => {
+                stopRowActivation(event);
+                setMenuOpen(false);
+              }}
+            >
               Email
             </a>
           ) : null}
           <button
             type="button"
             role="menuitem"
+            tabIndex={-1}
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();

@@ -29,16 +29,18 @@ test("mention editor exposes a bidi-safe structured textbox", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /role="combobox"/);
-  assert.match(result.stdout, /role="textbox"/);
+  assert.doesNotMatch(result.stdout, /role="textbox"/);
   assert.match(result.stdout, /contentEditable="true"/);
+  assert.match(result.stdout, /aria-autocomplete="list"/);
   assert.match(result.stdout, /dir="auto"/);
-  assert.match(result.stdout, /aria-multiline="false"/);
+  assert.match(result.stdout, /data-multiline="false"/);
   assert.match(result.stdout, /data-contact-id="dana"/);
   assert.match(result.stdout, /<bdi dir="auto">@דנה כהן<\/bdi>/);
 });
 
 test("mention picker implements keyboard, paste, and composition behavior", () => {
   assert.match(editorSource, /role="listbox"/);
+  assert.match(editorSource, /role="option"[\s\S]*?tabIndex=\{-1\}/);
   assert.match(editorSource, /aria-activedescendant/);
   for (const key of [
     "ArrowDown",
@@ -52,6 +54,9 @@ test("mention picker implements keyboard, paste, and composition behavior", () =
   }
   assert.match(editorSource, /onPaste=/);
   assert.match(editorSource, /getData\("text\/plain"\)/);
+  assert.match(editorSource, /replaceMentionText/);
+  assert.match(editorSource, /insertParagraph/);
+  assert.match(editorSource, /insertLineBreak/);
   assert.match(editorSource, /onCompositionStart=/);
   assert.match(editorSource, /onCompositionEnd=/);
   assert.match(editorSource, /isComposing\.current/);
@@ -59,6 +64,8 @@ test("mention picker implements keyboard, paste, and composition behavior", () =
   assert.match(editorSource, /<bdi dir="auto">\{contact\.name\}<\/bdi>/);
   assert.match(editorSource, /<bdi dir="auto">\{contact\.roleOrCompany\}<\/bdi>/);
   assert.match(editorSource, /No matching contacts/);
+  assert.match(editorSource, /onBlur=/);
+  assert.match(editorSource, /window\.addEventListener\("scroll"/);
 });
 
 test("manual selector deduplicates chips and delegates metadata-only removal", () => {
@@ -84,6 +91,20 @@ test("manual selector deduplicates chips and delegates metadata-only removal", (
   );
   assert.equal(result.status, 0, result.stderr);
   assert.equal((result.stdout.match(/class="contact-chip"/g) ?? []).length, 1);
+
+  const mentionOnlyResult = spawnSync(
+    process.execPath,
+    [
+      "--import",
+      "tsx",
+      "--input-type=module",
+      "-e",
+      script.replace('manualContactIds: ["dana"]', 'manualContactIds: []'),
+    ],
+    { cwd: new URL("..", import.meta.url), encoding: "utf8" },
+  );
+  assert.equal(mentionOnlyResult.status, 0, mentionOnlyResult.stderr);
+  assert.match(mentionOnlyResult.stdout, /<option value="dana">/);
 });
 
 test("removing a linked contact preserves visible text through the pure helper", () => {

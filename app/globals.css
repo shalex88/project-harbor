@@ -1770,7 +1770,7 @@ strong.work-item-title {
   unicode-bidi: plaintext;
 }
 
-.mention-editor-input[aria-multiline="true"] {
+.mention-editor-input[data-multiline="true"] {
   min-height: 104px;
 }
 

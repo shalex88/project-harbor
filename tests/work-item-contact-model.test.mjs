@@ -8,6 +8,7 @@ import {
   rankMentionContacts,
   reconcileMentionText,
   removeContactMentions,
+  replaceMentionText,
   serializeMentionField,
 } from "../lib/work-item-contacts.ts";
 
@@ -39,6 +40,21 @@ test("mention queries support Hebrew roles and do not trigger inside email", () 
     query: "עורך דין",
   });
   assert.equal(findMentionQuery("mail dana@example.com", 17), null);
+});
+
+test("existing structured mentions never reopen the contact query", () => {
+  const text = "Call @Maya Levi regarding @law";
+  const mentions = [
+    { contactId: "maya", startOffset: 5, endOffset: 15 },
+  ];
+
+  assert.equal(findMentionQuery(text, 15, mentions), null);
+  assert.equal(findMentionQuery(text, 25, mentions), null);
+  assert.deepEqual(findMentionQuery(text, text.length, mentions), {
+    startOffset: 26,
+    endOffset: 30,
+    query: "law",
+  });
 });
 
 test("role prefixes rank before names and remain stable", () => {
@@ -87,6 +103,22 @@ test("text edits shift later mentions and unlink an edited mention", () => {
     reconcileMentionText(value, "Call @May Levi and @Dan Reed").mentions,
     [{ contactId: "dan", startOffset: 19, endOffset: 28 }],
   );
+});
+
+test("explicit multiline and paste edits preserve plain text offsets", () => {
+  const value = {
+    text: "First @Maya Levi last",
+    mentions: [{ contactId: "maya", startOffset: 6, endOffset: 16 }],
+  };
+
+  assert.deepEqual(replaceMentionText(value, 5, 5, "\n"), {
+    text: "First\n @Maya Levi last",
+    mentions: [{ contactId: "maya", startOffset: 7, endOffset: 17 }],
+  });
+  assert.deepEqual(replaceMentionText(value, 4, 17, "\nNext"), {
+    text: "Firs\nNextlast",
+    mentions: [],
+  });
 });
 
 test("manual removal keeps text and current names rewrite ranges safely", () => {

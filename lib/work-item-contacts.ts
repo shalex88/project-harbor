@@ -48,6 +48,7 @@ function sortMentions(mentions: MentionRange[]): MentionRange[] {
 export function findMentionQuery(
   text: string,
   caretOffset: number,
+  mentions: MentionRange[] = [],
 ): MentionQuery | null {
   if (
     !Number.isSafeInteger(caretOffset) ||
@@ -59,6 +60,14 @@ export function findMentionQuery(
 
   const startOffset = text.lastIndexOf("@", Math.max(0, caretOffset - 1));
   if (startOffset < 0) return null;
+  if (
+    mentions.some(
+      (mention) =>
+        startOffset >= mention.startOffset && startOffset < mention.endOffset,
+    )
+  ) {
+    return null;
+  }
   if (
     startOffset > 0 &&
     !TRIGGER_BOUNDARY_PATTERN.test(text[startOffset - 1] ?? "")
@@ -192,6 +201,38 @@ export function reconcileMentionText(
   });
 
   return { text: nextText, mentions: sortMentions(mentions) };
+}
+
+export function replaceMentionText(
+  value: MentionEditorValue,
+  startOffset: number,
+  endOffset: number,
+  replacement: string,
+): MentionEditorValue {
+  const safeStart = Math.max(0, Math.min(startOffset, value.text.length));
+  const safeEnd = Math.max(safeStart, Math.min(endOffset, value.text.length));
+  const delta = replacement.length - (safeEnd - safeStart);
+  const mentions = value.mentions.flatMap<MentionRange>((mention) => {
+    if (mention.endOffset <= safeStart) return [mention];
+    if (mention.startOffset >= safeEnd) {
+      return [
+        {
+          ...mention,
+          startOffset: mention.startOffset + delta,
+          endOffset: mention.endOffset + delta,
+        },
+      ];
+    }
+    return [];
+  });
+
+  return {
+    text:
+      value.text.slice(0, safeStart) +
+      replacement +
+      value.text.slice(safeEnd),
+    mentions: sortMentions(mentions),
+  };
 }
 
 export function removeContactMentions(

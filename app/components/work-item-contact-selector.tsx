@@ -24,7 +24,10 @@ export function WorkItemContactSelector({
     const contact = contactsById.get(contactId);
     return contact ? [contact] : [];
   });
-  const availableContacts = contacts.filter((contact) => !linkedIds.has(contact.id));
+  const manualIds = new Set(manualContactIds);
+  const availableContacts = contacts.filter(
+    (contact) => !manualIds.has(contact.id),
+  );
 
   const addManualContact = (contactId: string) => {
     setSelection("");
