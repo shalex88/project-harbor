@@ -43,6 +43,13 @@
       "when": 1785568760099,
       "tag": "0005_spotty_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785581220556,
+      "tag": "0006_work_item_contact_mentions",
+      "breakpoints": true
     }
   ]
 }
