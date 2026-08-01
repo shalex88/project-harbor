@@ -39,6 +39,16 @@ function estimate(value: unknown): number | null | undefined {
   return validateMinorAmount(value);
 }
 
+function contactFields(value: JsonObject) {
+  return {
+    name: requireText(value.name, "Contact name", 160),
+    roleOrCompany: optionalText(value.roleOrCompany, 160, "Role or company"),
+    email: optionalText(value.email, 254, "Email"),
+    phone: optionalText(value.phone, 80, "Phone"),
+    notes: optionalText(value.notes, 2_000, "Notes"),
+  };
+}
+
 export function parseMutation(input: unknown): WorkspaceMutation {
   const value = asObject(input);
   const action = value.action;
@@ -80,6 +90,40 @@ export function parseMutation(input: unknown): WorkspaceMutation {
         action,
         projectId: id(value.projectId, "Project"),
         userId: id(value.userId, "Member"),
+      };
+    case "create_contact":
+      rejectUnknown(value, [
+        "projectId",
+        "name",
+        "roleOrCompany",
+        "email",
+        "phone",
+        "notes",
+      ]);
+      return {
+        action,
+        projectId: id(value.projectId, "Project"),
+        ...contactFields(value),
+      };
+    case "update_contact":
+      rejectUnknown(value, [
+        "contactId",
+        "name",
+        "roleOrCompany",
+        "email",
+        "phone",
+        "notes",
+      ]);
+      return {
+        action,
+        contactId: id(value.contactId, "Contact"),
+        ...contactFields(value),
+      };
+    case "delete_contact":
+      rejectUnknown(value, ["contactId"]);
+      return {
+        action,
+        contactId: id(value.contactId, "Contact"),
       };
     case "create_collection":
       rejectUnknown(value, ["projectId", "name", "color"]);

@@ -16,6 +16,18 @@ function manifestFixture() {
     version: 1,
     exportedAt: "2026-07-22T12:00:00.000Z",
     project: { name: "House", description: "", currency: "ILS" },
+    contacts: [
+      {
+        id: "contact-1",
+        name: "Dana Cohen",
+        roleOrCompany: "Architect",
+        email: "dana@example.com",
+        phone: "+972 50 123 4567",
+        notes: "Planning lead",
+        createdAt: "2026-07-01T10:00:00.000Z",
+        updatedAt: "2026-07-02T10:00:00.000Z",
+      },
+    ],
     collections: [
       {
         id: "collection-1",
@@ -118,8 +130,9 @@ test("archive export queries authorize first and remain project scoped", () => {
   assert.match(source, /WHERE p\.id = \?/);
   assert.match(source, /wi\.project_id = \?/);
   assert.match(source, /fo\.project_id = \?/);
+  assert.match(source, /FROM project_contacts pc/);
+  assert.match(source, /WHERE pc\.project_id = \?/);
   assert.doesNotMatch(source, /project_invitations/);
-  assert.doesNotMatch(source, /\bemail\b/i);
 });
 
 test("fresh import plans remap every entity and payload reference", () => {
@@ -132,6 +145,8 @@ test("fresh import plans remap every entity and payload reference", () => {
   assert.equal(plan.itemIds.size, 2);
   assert.equal(plan.relationIds.size, 1);
   assert.equal(plan.paymentIds.size, 1);
+  assert.equal(plan.contactIds.size, 1);
+  assert.notEqual(plan.contactIds.get("contact-1"), "contact-1");
   assert.equal(plan.payloads.length, 2);
 
   for (const item of manifest.items) {
@@ -175,6 +190,10 @@ test("reimporting the same manifest produces independent ids and storage keys", 
   assert.notEqual(first.projectId, second.projectId);
   assert.notDeepEqual([...first.itemIds.values()], [...second.itemIds.values()]);
   assert.notDeepEqual(
+    [...first.contactIds.values()],
+    [...second.contactIds.values()],
+  );
+  assert.notDeepEqual(
     first.payloads.map((payload) => payload.r2Key),
     second.payloads.map((payload) => payload.r2Key),
   );
@@ -185,6 +204,8 @@ test("import persistence maps attribution to labels and writes one D1 batch", ()
   assert.match(source, /imported_uploader_label/);
   assert.match(source, /created_by.*ownerUserId/s);
   assert.match(source, /uploaded_by.*ownerUserId/s);
+  assert.match(source, /INSERT INTO project_contacts/);
+  assert.match(source, /plan\.contactIds\.get\(contact\.id\)/);
   assert.match(source, /db\.batch\(statements\)/);
   assert.doesNotMatch(source, /\binf\.pinned\b|attachment\.pinned/);
 });

@@ -19,6 +19,7 @@ async function validArchive() {
       version: 1,
       exportedAt: "2026-07-22T12:00:00.000Z",
       project: { name: "House", description: "", currency: "ILS" },
+      contacts: [],
       collections: [
         {
           id: "collection-1",

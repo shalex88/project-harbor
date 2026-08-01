@@ -34,6 +34,18 @@ async function importFixture() {
     version: 1,
     exportedAt: "2026-07-22T12:00:00.000Z",
     project: { name: "House", description: "", currency: "ILS" },
+    contacts: [
+      {
+        id: "contact-1",
+        name: "Dana Cohen",
+        roleOrCompany: "Architect",
+        email: "dana@example.com",
+        phone: "+972 50 123 4567",
+        notes: "Planning lead",
+        createdAt: "2026-07-01T10:00:00.000Z",
+        updatedAt: "2026-07-02T10:00:00.000Z",
+      },
+    ],
     collections: [
       {
         id: "collection-1",
@@ -239,6 +251,7 @@ test("export loads every stored payload and produces a valid Harbor archive", as
   const fixture = await importFixture();
   const source = {
     project: fixture.manifest.project,
+    contacts: fixture.manifest.contacts,
     collections: fixture.manifest.collections,
     items: fixture.manifest.items,
     relations: fixture.manifest.relations,
@@ -274,6 +287,7 @@ test("export loads every stored payload and produces a valid Harbor archive", as
   const decoded = await decodeProjectArchive(result.bytes);
   assert.deepEqual(decoded.payloads, fixture.payloads);
   assert.equal(decoded.manifest.exportedAt, "2026-07-22T12:00:00.000Z");
+  assert.deepEqual(decoded.manifest.contacts, fixture.manifest.contacts);
   assert.deepEqual(decoded.manifest.payments, fixture.manifest.payments);
   assert.deepEqual(decoded.manifest.attachments, fixture.manifest.attachments);
   assert.deepEqual(decoded.manifest.receipts, fixture.manifest.receipts);
@@ -284,6 +298,7 @@ test("export reflects the source's current empty payment and file state", async 
   const fixture = await importFixture();
   const source = {
     project: fixture.manifest.project,
+    contacts: fixture.manifest.contacts,
     collections: fixture.manifest.collections,
     items: fixture.manifest.items,
     relations: fixture.manifest.relations,

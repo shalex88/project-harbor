@@ -58,11 +58,13 @@ Scripts that need writable project-scoped home, npm, XDG, and temporary paths us
 
 - ChatGPT sign-in and explicit project membership
 - projects with multiple ordered collections
+- project-specific external contact directories with aggregate workspace access
 - distinct task and event records with follow-up, blocking, and related links
 - item files, pinning, payment records, and receipts in R2
 - overview, task, event, timeline, and spending dashboards
 - full desktop and mobile feature parity
 - D1 persistence through Drizzle migrations
+- project archives preserve contacts alongside work, files, and spending data
 
 ## Workspace Auth Headers
 

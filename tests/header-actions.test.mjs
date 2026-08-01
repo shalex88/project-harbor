@@ -26,6 +26,12 @@ test("spending offers no creation actions", () => {
   assert.deepEqual(headerActionsForRoute("spending"), {});
 });
 
+test("contacts offers contact creation", () => {
+  assert.deepEqual(headerActionsForRoute("contacts"), {
+    primary: "contact",
+  });
+});
+
 test("other routes preserve their existing primary creation action", () => {
   assert.equal(
     typeof headerActionsForRoute,

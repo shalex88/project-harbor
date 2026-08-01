@@ -82,6 +82,18 @@ test("workspace snapshots load authorized relationship records", () => {
   assert.match(repository, /JOIN project_members current ON current\.project_id = wir\.project_id/);
 });
 
+test("workspace snapshots load membership-scoped contacts in name order", () => {
+  assert.match(repository, /const contacts = await all/);
+  assert.match(repository, /FROM project_contacts pc/);
+  assert.match(
+    repository,
+    /JOIN project_members current ON current\.project_id = pc\.project_id/,
+  );
+  assert.match(repository, /WHERE current\.user_id = \?/);
+  assert.match(repository, /ORDER BY pc\.name COLLATE NOCASE,pc\.id/);
+  assert.match(repository, /contacts: contacts\.map<ContactRecord>/);
+});
+
 test("preview persistence and seed data use only todo and done task states", () => {
   assert.match(repository, /status IN \('todo','done'\)/);
   assert.doesNotMatch(repository, /status IN \('todo','in_progress','done'\)/);

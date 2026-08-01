@@ -46,6 +46,15 @@ test("work item relationships are project scoped and reject invalid rows", () =>
   );
 });
 
+test("project contacts are project scoped and cascade with their project", () => {
+  assert.match(migration, /CREATE TABLE `project_contacts`/);
+  assert.match(
+    migration,
+    /FOREIGN KEY \(`project_id`\) REFERENCES `projects`\(`id`\).*ON DELETE cascade/,
+  );
+  assert.match(migration, /CREATE INDEX `project_contacts_project_name_idx`/);
+});
+
 test("task status migration maps in-progress rows before enforcing two states", () => {
   const twoStateMigration =
     migrationSources.find((source) =>
