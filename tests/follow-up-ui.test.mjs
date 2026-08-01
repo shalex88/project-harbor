@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { followUpCreatedItemMode } from "../app/components/follow-up-result.ts";
 
-function runInteractionScript(body) {
+function runInteractionScript(body, { animationFrameDelay = 0 } = {}) {
   const script = String.raw`
     import { JSDOM } from "jsdom";
 
@@ -22,7 +22,8 @@ function runInteractionScript(body) {
     globalThis.PointerEvent = dom.window.PointerEvent ?? dom.window.MouseEvent;
     globalThis.MouseEvent = dom.window.MouseEvent;
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
-    globalThis.requestAnimationFrame = (callback) => setTimeout(callback, 0);
+    globalThis.requestAnimationFrame = (callback) =>
+      setTimeout(callback, ${animationFrameDelay});
     globalThis.cancelAnimationFrame = (handle) => clearTimeout(handle);
     const ReactModule = await import("react");
     const React = ReactModule.default;
@@ -31,6 +32,15 @@ function runInteractionScript(body) {
     const { FollowUpMenu } = await import("./app/components/follow-up-menu.tsx");
     const { ItemSheet } = await import("./app/components/item-sheet.tsx");
     const flush = () => new Promise((resolve) => setTimeout(resolve, 5));
+    const waitFor = async (condition, description, timeoutMs = 1000) => {
+      const startedAt = Date.now();
+      while (!condition()) {
+        if (Date.now() - startedAt >= timeoutMs) {
+          throw new Error("Timed out waiting for " + description);
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    };
     const click = async (element) => {
       await act(async () => {
         element.click();
@@ -81,6 +91,10 @@ test("rendered follow-up menu selects both types and consumes Escape", () => {
 
     const trigger = document.querySelector("[aria-haspopup='menu']");
     await click(trigger);
+    await waitFor(
+      () => document.activeElement?.textContent === "Task",
+      "the first follow-up choice to receive focus",
+    );
     const firstFocusedText = document.activeElement?.textContent;
     await click([...document.querySelectorAll("[role='menuitem']")].find((item) => item.textContent === "Task"));
     await click(trigger);
@@ -90,6 +104,10 @@ test("rendered follow-up menu selects both types and consumes Escape", () => {
       document.querySelector("#outside").dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       await flush();
     });
+    await waitFor(
+      () => document.querySelector("[role='menu']") === null && document.activeElement === trigger,
+      "outside dismissal to restore trigger focus",
+    );
     const outsideClosed = document.querySelector("[role='menu']") === null;
     const outsideFocusRestored = document.activeElement === trigger;
     trigger.focus();
@@ -97,11 +115,19 @@ test("rendered follow-up menu selects both types and consumes Escape", () => {
       trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
       await flush();
     });
+    await waitFor(
+      () => document.activeElement?.textContent === "Task",
+      "Arrow Up opening to focus the first choice",
+    );
     const arrowUpFocusedText = document.activeElement?.textContent;
     await act(async () => {
       document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await flush();
     });
+    await waitFor(
+      () => document.querySelector("[role='menu']") === null && document.activeElement === trigger,
+      "Escape dismissal to restore trigger focus",
+    );
 
     process.stdout.write(JSON.stringify({
       selected,
@@ -114,7 +140,7 @@ test("rendered follow-up menu selects both types and consumes Escape", () => {
       sheetEscapeCount,
     }));
     root.unmount();
-  `);
+  `, { animationFrameDelay: 25 });
 
   assert.deepEqual(result, {
     selected: ["task", "event"],
