@@ -3,6 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import type {
   CollectionRecord,
+  ContactRecord,
   EventRecord,
   TaskRecord,
   WorkspaceMutation,
@@ -10,6 +11,7 @@ import type {
 } from "@/lib/domain";
 import { formatMoney, summarizeSpending } from "@/lib/domain";
 import { workItemMetadata } from "@/lib/relation-metadata";
+import { ContactGrid } from "./contact-directory";
 import { TaskStatusChip } from "./task-status-chip";
 import { EmptyState, Field, FormActions, MetricCard, Modal, SubmitForm } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
@@ -32,6 +34,9 @@ export function ProjectWorkspace({
   onCreateItem,
   onOpenItem,
   onMutate,
+  onCreateContact = () => {},
+  onEditContact = () => {},
+  onDeleteContact = () => {},
 }: {
   snapshot: WorkspaceSnapshot;
   projectId: string;
@@ -41,6 +46,9 @@ export function ProjectWorkspace({
   onCreateItem: (type: "task" | "event", collectionId: string) => void;
   onOpenItem: (itemId: string) => void;
   onMutate: (mutation: WorkspaceMutation) => Promise<void>;
+  onCreateContact?: (projectId: string) => void;
+  onEditContact?: (contact: ContactRecord) => void;
+  onDeleteContact?: (contact: ContactRecord) => void;
 }) {
   const [dialog, setDialog] = useState<DialogState>(null);
   const project = snapshot.projects.find((candidate) => candidate.id === projectId);
@@ -55,6 +63,9 @@ export function ProjectWorkspace({
   );
   const tasks = items.filter((item): item is TaskRecord => item.type === "task");
   const events = items.filter((item): item is EventRecord => item.type === "event");
+  const contacts = snapshot.contacts.filter(
+    (contact) => contact.projectId === projectId,
+  );
   const members = snapshot.members.filter((member) => member.projectId === projectId);
   const invitations = snapshot.invitations.filter((invitation) => invitation.projectId === projectId);
   const canManageMembers = project?.role === "owner";
@@ -256,6 +267,28 @@ export function ProjectWorkspace({
           </section>
         </div>
       ) : null}
+
+      <section className="contact-section">
+        <header className="section-heading">
+          <div>
+            <p className="eyebrow">Contacts</p>
+            <h2>Contacts</h2>
+          </div>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => onCreateContact(projectId)}
+          >
+            + New contact
+          </button>
+        </header>
+        <ContactGrid
+          contacts={contacts}
+          projects={snapshot.projects}
+          onEdit={onEditContact}
+          onDelete={onDeleteContact}
+        />
+      </section>
 
       <section className="people-section">
         <header className="section-heading">
