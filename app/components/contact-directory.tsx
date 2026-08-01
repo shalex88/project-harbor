@@ -1,6 +1,10 @@
 "use client";
 
-import type { ContactRecord, ProjectRecord } from "@/lib/domain";
+import type {
+  ContactRecord,
+  ProjectRecord,
+  WorkspaceSnapshot,
+} from "@/lib/domain";
 import { EmptyState } from "./ui";
 
 export function ContactGrid({
@@ -81,5 +85,28 @@ export function ContactGrid({
         </article>
       ))}
     </div>
+  );
+}
+
+export function ContactsWorkspace({
+  snapshot,
+  onEdit,
+  onDelete,
+}: {
+  snapshot: WorkspaceSnapshot;
+  onEdit: (contact: ContactRecord) => void;
+  onDelete: (contact: ContactRecord) => void;
+}) {
+  return (
+    <section className="contacts-workspace" aria-label="All project contacts">
+      <ContactGrid
+        contacts={snapshot.contacts}
+        projects={snapshot.projects}
+        showProject
+        emptyDescription="Add a contact to any project to build your workspace directory."
+        onEdit={onEdit}
+        onDelete={onDelete}
+      />
+    </section>
   );
 }

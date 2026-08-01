@@ -13,7 +13,7 @@ import { formatCurrentDate } from "./current-date";
 import { ProjectMenu } from "./project-menu";
 import { Field, FormActions, Modal, Sheet, SubmitForm } from "./ui";
 
-export type AppRoute = "overview" | "tasks" | "events" | "timeline" | "spending" | "project";
+export type AppRoute = "overview" | "tasks" | "events" | "timeline" | "spending" | "contacts" | "project";
 
 type ProjectActionDialog =
   | { kind: "rename"; project: ProjectRecord }
@@ -26,6 +26,7 @@ const NAV_ITEMS: Array<{ route: AppRoute; label: string; mark: string }> = [
   { route: "events", label: "Events", mark: "◷" },
   { route: "timeline", label: "Timeline", mark: "▦" },
   { route: "spending", label: "Spending", mark: "$" },
+  { route: "contacts", label: "Contacts", mark: "◎" },
 ];
 
 const MOBILE_ITEMS: Array<{ route: AppRoute | "more"; label: string; mark: string }> = [
@@ -253,6 +254,7 @@ export function AppShell({
       <Sheet open={mobileMoreOpen} title="More" onClose={() => setMobileMoreOpen(false)}>
         <div className="mobile-more-list">
           <button type="button" onClick={() => navigate("spending")}>$ <span>Spending</span></button>
+          <button type="button" onClick={() => navigate("contacts")}>◎ <span>Contacts</span></button>
           <p className="nav-heading">Projects</p>
           {projects.map((project) => (
             <div className="mobile-project-row" key={project.id}>

@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import type {
+  ContactRecord,
   WorkspaceMutation,
   WorkspaceMutationResult,
   WorkspaceSnapshot,
@@ -18,6 +19,7 @@ import {
   uploadFileInChunks,
 } from "@/lib/upload-client";
 import { AppShell, type AppRoute } from "./app-shell";
+import { ContactsWorkspace } from "./contact-directory";
 import {
   EventsDashboard,
   OverviewDashboard,
@@ -46,6 +48,12 @@ type CreateLocation = {
   projectId: string;
   collectionId: string;
 } | null;
+
+type ContactDialogState =
+  | { kind: "create"; projectId: string }
+  | { kind: "edit"; contact: ContactRecord }
+  | { kind: "delete"; contact: ContactRecord }
+  | null;
 
 export function HarborApp({
   initialSnapshot,
@@ -81,6 +89,8 @@ export function HarborApp({
   const [itemMode, setItemMode] = useState<ItemSheetMode>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [createLocation, setCreateLocation] = useState<CreateLocation>(null);
+  const [contactDialog, setContactDialog] =
+    useState<ContactDialogState>(null);
   const [pending, setPending] = useState(false);
   const [importing, setImporting] = useState(false);
   const [exportingProjectId, setExportingProjectId] = useState<string | null>(null);
@@ -394,9 +404,78 @@ export function HarborApp({
     setCreateLocation({ type, projectId, collectionId });
   };
 
+  const openGlobalContactCreate = () => {
+    const projectId = snapshot.projects[0]?.id;
+    if (!projectId) {
+      pushToast("Create a project before adding contacts", "info");
+      setNewProjectOpen(true);
+      return;
+    }
+    setContactDialog({ kind: "create", projectId });
+  };
+
+  const openProjectContactCreate = (projectId: string) => {
+    setContactDialog({ kind: "create", projectId });
+  };
+
+  const openContactEdit = (contact: ContactRecord) => {
+    setContactDialog({ kind: "edit", contact });
+  };
+
+  const openContactDelete = (contact: ContactRecord) => {
+    setContactDialog({ kind: "delete", contact });
+  };
+
+  const submitContact = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!contactDialog || contactDialog.kind === "delete") return;
+    const data = new FormData(event.currentTarget);
+    const fields = {
+      name: String(data.get("name") ?? ""),
+      roleOrCompany: String(data.get("roleOrCompany") ?? ""),
+      email: String(data.get("email") ?? ""),
+      phone: String(data.get("phone") ?? ""),
+      notes: String(data.get("notes") ?? ""),
+    };
+    try {
+      if (contactDialog.kind === "create") {
+        await mutate({
+          action: "create_contact",
+          projectId: String(
+            data.get("projectId") ?? contactDialog.projectId,
+          ),
+          ...fields,
+        });
+      } else {
+        await mutate({
+          action: "update_contact",
+          contactId: contactDialog.contact.id,
+          ...fields,
+        });
+      }
+      setContactDialog(null);
+    } catch {
+      // The shared toast reports the error and the editor remains open.
+    }
+  };
+
+  const deleteContact = async () => {
+    if (contactDialog?.kind !== "delete") return;
+    try {
+      await mutate({
+        action: "delete_contact",
+        contactId: contactDialog.contact.id,
+      });
+      setContactDialog(null);
+    } catch {
+      // The shared toast reports the error and the confirmation remains open.
+    }
+  };
+
   const headerActions = headerActionsForRoute(route);
 
   const runHeaderAction = (kind: HeaderActionKind) => {
+    if (kind === "contact") return openGlobalContactCreate();
     if (kind === "event") return openCreate("event");
     if (kind === "task") {
       if (route === "project") {
@@ -415,7 +494,9 @@ export function HarborApp({
     kind
       ? {
           label:
-            kind === "task"
+            kind === "contact"
+              ? "New contact"
+              : kind === "task"
               ? "New task"
               : kind === "event"
                 ? "New event"
@@ -434,7 +515,9 @@ export function HarborApp({
             ? "Timeline"
             : route === "spending"
               ? "Spending"
-              : activeProject?.name ?? "Project";
+              : route === "contacts"
+                ? "Contacts"
+                : activeProject?.name ?? "Project";
 
   const dashboardProps = {
     snapshot,
@@ -451,6 +534,15 @@ export function HarborApp({
     }
     if (route === "spending") {
       return <SpendingDashboard {...dashboardProps} />;
+    }
+    if (route === "contacts") {
+      return (
+        <ContactsWorkspace
+          snapshot={snapshot}
+          onEdit={openContactEdit}
+          onDelete={openContactDelete}
+        />
+      );
     }
     if (route === "project" && activeProjectId) {
       return (
@@ -469,6 +561,9 @@ export function HarborApp({
           onMutate={async (mutation) => {
             await mutate(mutation);
           }}
+          onCreateContact={openProjectContactCreate}
+          onEditContact={openContactEdit}
+          onDeleteContact={openContactDelete}
         />
       );
     }
@@ -554,6 +649,13 @@ export function HarborApp({
     }
   };
 
+  const editedContact =
+    contactDialog?.kind === "edit" ? contactDialog.contact : null;
+  const contactProjectId =
+    contactDialog?.kind === "create"
+      ? contactDialog.projectId
+      : editedContact?.projectId ?? "";
+
   return (
     <>
       <AppShell
@@ -590,6 +692,117 @@ export function HarborApp({
         onRenameFile={renameFile}
         onDeleteFile={deleteFile}
       />
+
+      <Modal
+        open={contactDialog?.kind === "create" || contactDialog?.kind === "edit"}
+        title={editedContact ? "Edit contact" : "New contact"}
+        description="Keep the people relevant to this project close at hand."
+        onClose={() => {
+          if (!pending) setContactDialog(null);
+        }}
+      >
+        {contactDialog?.kind === "create" || contactDialog?.kind === "edit" ? (
+          <SubmitForm onSubmit={submitContact}>
+            {contactDialog.kind === "create" && route === "contacts" ? (
+              <Field label="Project">
+                <select name="projectId" defaultValue={contactProjectId}>
+                  {snapshot.projects.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
+            <Field label="Name">
+              <input
+                name="name"
+                maxLength={160}
+                required
+                defaultValue={editedContact?.name ?? ""}
+                autoComplete="name"
+              />
+            </Field>
+            <Field label="Role or company" hint="Optional">
+              <input
+                name="roleOrCompany"
+                maxLength={160}
+                defaultValue={editedContact?.roleOrCompany ?? ""}
+                autoComplete="organization-title"
+              />
+            </Field>
+            <div className="form-columns">
+              <Field label="Email" hint="Optional">
+                <input
+                  name="email"
+                  maxLength={254}
+                  type="email"
+                  defaultValue={editedContact?.email ?? ""}
+                  autoComplete="email"
+                />
+              </Field>
+              <Field label="Phone" hint="Optional">
+                <input
+                  name="phone"
+                  maxLength={80}
+                  type="tel"
+                  defaultValue={editedContact?.phone ?? ""}
+                  autoComplete="tel"
+                />
+              </Field>
+            </div>
+            <Field label="Notes" hint="Optional">
+              <textarea
+                name="notes"
+                maxLength={2000}
+                defaultValue={editedContact?.notes ?? ""}
+              />
+            </Field>
+            <FormActions
+              submitLabel={editedContact ? "Save contact" : "Create contact"}
+              pending={pending}
+              onCancel={() => setContactDialog(null)}
+            />
+          </SubmitForm>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={contactDialog?.kind === "delete"}
+        title="Delete contact"
+        description="This removes the contact from its project."
+        onClose={() => {
+          if (!pending) setContactDialog(null);
+        }}
+        size="small"
+      >
+        {contactDialog?.kind === "delete" ? (
+          <>
+            <p className="confirmation-copy">
+              Delete <strong>{contactDialog.contact.name}</strong>? This cannot
+              be undone.
+            </p>
+            <div className="form-actions">
+              <button
+                className="button button-secondary"
+                type="button"
+                disabled={pending}
+                onClick={() => setContactDialog(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button button-danger"
+                type="button"
+                disabled={pending}
+                onClick={() => void deleteContact()}
+              >
+                {pending ? "Deleting…" : "Delete contact"}
+              </button>
+            </div>
+          </>
+        ) : null}
+      </Modal>
 
       <Modal
         open={newProjectOpen}
@@ -796,7 +1009,8 @@ function appLocation(pathname: string): {
     segments[0] === "tasks" ||
     segments[0] === "events" ||
     segments[0] === "timeline" ||
-    segments[0] === "spending"
+    segments[0] === "spending" ||
+    segments[0] === "contacts"
   ) {
     return { route: segments[0] };
   }
@@ -815,6 +1029,12 @@ function successMessage(mutation: WorkspaceMutation): string {
       return "Invitation saved";
     case "remove_member":
       return "Member removed";
+    case "create_contact":
+      return "Contact created";
+    case "update_contact":
+      return "Contact updated";
+    case "delete_contact":
+      return "Contact deleted";
     case "create_collection":
       return "Collection created";
     case "update_collection":

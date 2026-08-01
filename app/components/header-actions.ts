@@ -1,6 +1,6 @@
 import type { AppRoute } from "./app-shell";
 
-export type HeaderActionKind = "project" | "task" | "event";
+export type HeaderActionKind = "project" | "task" | "event" | "contact";
 
 export type HeaderActions = {
   primary?: HeaderActionKind;
@@ -9,6 +9,7 @@ export type HeaderActions = {
 
 export function headerActionsForRoute(route: AppRoute): HeaderActions {
   if (route === "spending") return {};
+  if (route === "contacts") return { primary: "contact" };
   if (route === "timeline") {
     return { secondary: "task", primary: "event" };
   }

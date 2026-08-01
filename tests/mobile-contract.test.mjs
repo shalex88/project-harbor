@@ -12,6 +12,12 @@ test("mobile navigation exposes every primary dashboard", async () => {
   assert.match(source, /aria-label="Mobile navigation"/);
 });
 
+test("contacts is available from the desktop navigation and mobile More sheet", async () => {
+  const source = await readFile(new URL("app/components/app-shell.tsx", root), "utf8");
+  assert.match(source, /route: "contacts", label: "Contacts"/);
+  assert.match(source, /navigate\("contacts"\)/);
+});
+
 test("desktop brand displays the browser-local current date", async () => {
   const source = await readFile(new URL("app/components/app-shell.tsx", root), "utf8");
   assert.match(source, /formatCurrentDate\(new Date\(\)\)/);
