@@ -7,7 +7,10 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { nextFollowUpMenuIndex } from "./follow-up-menu-navigation";
+import {
+  handleFollowUpMenuEscape,
+  nextFollowUpMenuIndex,
+} from "./follow-up-menu-navigation";
 
 type FollowUpType = "task" | "event";
 
@@ -64,11 +67,7 @@ export function FollowUpMenu({
   };
 
   const handleMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      dismiss(true);
-      return;
-    }
+    if (handleFollowUpMenuEscape(event, dismiss)) return;
     if (event.key === "Tab") {
       setOpen(false);
       return;
@@ -109,13 +108,12 @@ export function FollowUpMenu({
             openMenu(0);
           }
         }}
-        onKeyDown={(event) => {
+        onKeyDownCapture={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
             openMenu(event.key === "ArrowUp" ? 1 : 0);
-          } else if (event.key === "Escape" && open) {
-            event.preventDefault();
-            dismiss(true);
+          } else if (open) {
+            handleFollowUpMenuEscape(event, dismiss);
           }
         }}
       >
@@ -128,7 +126,7 @@ export function FollowUpMenu({
           className="follow-up-menu-popover"
           role="menu"
           aria-label="Create follow-up type"
-          onKeyDown={handleMenuKeyDown}
+          onKeyDownCapture={handleMenuKeyDown}
         >
           <button type="button" role="menuitem" tabIndex={-1} onClick={() => select("task")}><span>Task</span></button>
           <button type="button" role="menuitem" tabIndex={-1} onClick={() => select("event")}><span>Event</span></button>

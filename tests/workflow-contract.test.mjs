@@ -81,6 +81,10 @@ test("tasks and events create task or event follow-ups from one menu", () => {
   assert.match(followUpMenuSource, /aria-haspopup="menu"/);
   assert.match(followUpMenuSource, /role="menu"/);
   assert.match(followUpMenuSource, /role="menuitem"/);
+  assert.match(
+    followUpMenuSource,
+    /onKeyDownCapture=\{handleMenuKeyDown\}/,
+  );
   assert.match(itemSource, /sourceItemId/);
   assert.match(itemSource, /type: "task" \| "event"/);
   assert.match(itemSource, /action: "create_follow_up_item"/);

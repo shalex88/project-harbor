@@ -12,3 +12,18 @@ export function nextFollowUpMenuIndex(
   if (key === "End") return itemCount - 1;
   return null;
 }
+
+export function handleFollowUpMenuEscape(
+  event: {
+    key: string;
+    preventDefault: () => void;
+    stopPropagation: () => void;
+  },
+  dismiss: (restoreFocus: boolean) => void,
+): boolean {
+  if (event.key !== "Escape") return false;
+  event.preventDefault();
+  event.stopPropagation();
+  dismiss(true);
+  return true;
+}
