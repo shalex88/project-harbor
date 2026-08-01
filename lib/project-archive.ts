@@ -609,6 +609,7 @@ function validateReferences(manifest: ProjectArchiveManifestV1): void {
     id: contact.id,
     projectId: "archive",
     name: contact.name,
+    roleOrCompany: contact.roleOrCompany,
   }));
   for (const item of manifest.items) {
     const archivedLinks = [...(linksByItem.get(item.id) ?? [])].sort((a, b) =>

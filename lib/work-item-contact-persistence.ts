@@ -2,11 +2,13 @@ import {
   DomainError,
   type ContactMentionInput,
 } from "./domain.ts";
+import { mentionContactLabel } from "./work-item-contacts.ts";
 
 export type ContactIdentity = {
   id: string;
   projectId: string;
   name: string;
+  roleOrCompany: string;
 };
 
 export type ValidatedWorkItemContactState = {
@@ -91,9 +93,10 @@ export function validateWorkItemContactState(input: {
       contactsById,
     );
     if (
-      text.slice(mention.startOffset, mention.endOffset) !== `@${contact.name}`
+      text.slice(mention.startOffset, mention.endOffset) !==
+      `@${mentionContactLabel(contact)}`
     ) {
-      throw new DomainError("Contact mention does not match the contact name");
+      throw new DomainError("Contact mention does not match the contact label");
     }
     linkedContactIds.add(contact.id);
     previous = mention;

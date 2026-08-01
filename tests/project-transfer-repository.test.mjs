@@ -43,7 +43,7 @@ function manifestFixture() {
         id: "task-z",
         collectionId: "collection-1",
         type: "task",
-        title: "Call @Dana Cohen",
+        title: "Call @Architect",
         description: "",
         status: "todo",
         dueDate: null,
@@ -75,7 +75,7 @@ function manifestFixture() {
         contactId: "contact-1",
         field: "title",
         startOffset: 5,
-        endOffset: 16,
+        endOffset: 15,
       },
     ],
     relations: [

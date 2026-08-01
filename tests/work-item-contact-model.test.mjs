@@ -73,7 +73,9 @@ test("selection inserts a role label with the contact id and returns the next ca
     { text: "Call a @lawyer", mentions: [] },
     { startOffset: 7, endOffset: 14, query: "lawyer" },
     contacts[1],
+    160,
   );
+  assert.ok(result);
 
   assert.equal(result.value.text, "Call a @Lawyer");
   assert.deepEqual(result.value.mentions, [
@@ -88,9 +90,29 @@ test("selection inserts a role label with the contact id and returns the next ca
     { text: hebrewText, mentions: [] },
     hebrewQuery,
     contacts[0],
+    160,
   );
+  assert.ok(hebrewResult);
   assert.equal(hebrewResult.value.text, "פגישה עם @עורכת דין");
   assert.equal((hebrewResult.value.text.match(/@/g) ?? []).length, 1);
+});
+
+test("mention insertion enforces max length as an inclusive boundary", () => {
+  const blocked = insertContactMention(
+    { text: "123456789 @l", mentions: [] },
+    { startOffset: 10, endOffset: 12, query: "l" },
+    contacts[1],
+    12,
+  );
+  assert.equal(blocked, null);
+
+  const exact = insertContactMention(
+    { text: "Call @law", mentions: [] },
+    { startOffset: 5, endOffset: 9, query: "law" },
+    contacts[1],
+    12,
+  );
+  assert.equal(exact?.value.text, "Call @Lawyer");
 });
 
 test("text edits shift later mentions and unlink an edited mention", () => {

@@ -125,9 +125,13 @@ export function insertContactMention(
   value: MentionEditorValue,
   query: MentionQuery,
   contact: Pick<ContactRecord, "id" | "name" | "roleOrCompany">,
-): { value: MentionEditorValue; caretOffset: number } {
+  maxLength: number,
+): { value: MentionEditorValue; caretOffset: number } | null {
   const replacement = `@${mentionContactLabel(contact)}`;
   const replacedLength = query.endOffset - query.startOffset;
+  if (value.text.length - replacedLength + replacement.length > maxLength) {
+    return null;
+  }
   const delta = replacement.length - replacedLength;
   const endOffset = query.startOffset + replacement.length;
   const mentions = value.mentions.flatMap<MentionRange>((mention) => {

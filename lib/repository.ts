@@ -451,14 +451,16 @@ async function projectContactIdentities(
     id: string;
     project_id: string;
     name: string;
+    role_or_company: string;
   }>(
-    "SELECT id,project_id,name FROM project_contacts WHERE project_id = ? ORDER BY id",
+    "SELECT id,project_id,name,role_or_company FROM project_contacts WHERE project_id = ? ORDER BY id",
     projectId,
   );
   return rows.map((row) => ({
     id: row.id,
     projectId: row.project_id,
     name: row.name,
+    roleOrCompany: row.role_or_company,
   }));
 }
 

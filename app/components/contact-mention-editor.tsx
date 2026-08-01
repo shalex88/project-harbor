@@ -180,7 +180,12 @@ export function ContactMentionEditor({
       latestValueRef.current,
       query,
       contact,
+      maxLength,
     );
+    if (!inserted) {
+      closePicker();
+      return;
+    }
     latestValueRef.current = inserted.value;
     pendingCaret.current = inserted.caretOffset;
     onChange(inserted.value);

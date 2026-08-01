@@ -11,10 +11,53 @@ import {
 } from "../lib/work-item-contact-persistence.ts";
 
 const contacts = [
-  { id: "dana", projectId: "project-1", name: "דנה כהן" },
-  { id: "maya", projectId: "project-1", name: "Maya Levi" },
-  { id: "other", projectId: "project-2", name: "Other Person" },
+  {
+    id: "dana",
+    projectId: "project-1",
+    name: "דנה כהן",
+    roleOrCompany: "",
+  },
+  {
+    id: "maya",
+    projectId: "project-1",
+    name: "Maya Levi",
+    roleOrCompany: "",
+  },
+  {
+    id: "lawyer",
+    projectId: "project-1",
+    name: "Dana Cohen",
+    roleOrCompany: "עורכת דין",
+  },
+  {
+    id: "other",
+    projectId: "project-2",
+    name: "Other Person",
+    roleOrCompany: "",
+  },
 ];
+
+test("contact state accepts the canonical role-based mention label", () => {
+  const state = validateWorkItemContactState({
+    projectId: "project-1",
+    title: "Call @עורכת דין",
+    description: "",
+    manualContactIds: [],
+    contactMentions: [
+      {
+        contactId: "lawyer",
+        field: "title",
+        startOffset: 5,
+        endOffset: 15,
+      },
+    ],
+    contacts,
+  });
+
+  assert.deepEqual(state.links, [
+    { contactId: "lawyer", manuallyLinked: false },
+  ]);
+});
 
 test("contact state deduplicates manual and mentioned links", () => {
   const state = validateWorkItemContactState({
@@ -104,7 +147,7 @@ test("contact state rejects foreign contacts, overlaps, and false labels", () =>
           },
         ],
       }),
-    /does not match the contact name/i,
+    /does not match the contact label/i,
   );
 });
 
