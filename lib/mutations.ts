@@ -326,28 +326,60 @@ export function parseMutation(input: unknown): WorkspaceMutation {
     case "delete_item":
       rejectUnknown(value, ["itemId"]);
       return { action, itemId: id(value.itemId, "Item") };
-    case "create_follow_up_task":
-      rejectUnknown(value, [
-        "sourceEventId",
-        "collectionId",
-        "title",
-        "description",
-        "status",
-        "dueDate",
-        "estimatedCostMinor",
-        ...WORK_ITEM_CONTACT_KEYS,
-      ]);
-      return {
-        action,
-        sourceEventId: id(value.sourceEventId, "Source event"),
-        collectionId: id(value.collectionId, "Collection"),
-        title: requireText(value.title, "Task title", 160),
-        description: optionalText(value.description),
-        status: validateTaskStatus(value.status),
-        dueDate: validateOptionalIsoDate(value.dueDate, "Due date"),
-        estimatedCostMinor: estimate(value.estimatedCostMinor),
-        ...workItemContactFields(value),
-      };
+    case "create_follow_up_item": {
+      if (value.type === "task") {
+        rejectUnknown(value, [
+          "sourceItemId",
+          "collectionId",
+          "type",
+          "title",
+          "description",
+          "status",
+          "dueDate",
+          "estimatedCostMinor",
+          ...WORK_ITEM_CONTACT_KEYS,
+        ]);
+        return {
+          action,
+          sourceItemId: id(value.sourceItemId, "Source item"),
+          collectionId: id(value.collectionId, "Collection"),
+          type: "task",
+          title: requireText(value.title, "Task title", 160),
+          description: optionalText(value.description),
+          status: validateTaskStatus(value.status),
+          dueDate: validateOptionalIsoDate(value.dueDate, "Due date"),
+          estimatedCostMinor: estimate(value.estimatedCostMinor),
+          ...workItemContactFields(value),
+        };
+      }
+      if (value.type === "event") {
+        rejectUnknown(value, [
+          "sourceItemId",
+          "collectionId",
+          "type",
+          "title",
+          "description",
+          "occurrenceDate",
+          "estimatedCostMinor",
+          ...WORK_ITEM_CONTACT_KEYS,
+        ]);
+        return {
+          action,
+          sourceItemId: id(value.sourceItemId, "Source item"),
+          collectionId: id(value.collectionId, "Collection"),
+          type: "event",
+          title: requireText(value.title, "Event title", 160),
+          description: optionalText(value.description),
+          occurrenceDate: validateIsoDate(
+            value.occurrenceDate,
+            "Occurrence date",
+          ),
+          estimatedCostMinor: estimate(value.estimatedCostMinor),
+          ...workItemContactFields(value),
+        };
+      }
+      throw new DomainError("Item type must be task or event");
+    }
     case "create_relation": {
       rejectUnknown(value, [
         "sourceItemId",

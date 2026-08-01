@@ -238,9 +238,10 @@ test("item mutations strictly parse structured contact links and mentions", () =
 
   assert.deepEqual(
     parseMutation({
-      action: "create_follow_up_task",
-      sourceEventId: "event-1",
+      action: "create_follow_up_item",
+      sourceItemId: "event-1",
       collectionId: "collection-1",
+      type: "task",
       title: "Call @Dana",
       status: "todo",
       ...contactFields,
@@ -334,12 +335,13 @@ test("relationship mutations accept fixed types and canonicalize symmetric links
   );
 });
 
-test("follow-up task mutations use ordinary task fields and a source event", () => {
+test("follow-up item mutations accept task and event destinations from any item", () => {
   assert.deepEqual(
     parseMutation({
-      action: "create_follow_up_task",
-      sourceEventId: "event-1",
+      action: "create_follow_up_item",
+      sourceItemId: "item-1",
       collectionId: "collection-1",
+      type: "task",
       title: "Pay the Ministry of Housing voucher",
       description: "",
       status: "todo",
@@ -347,9 +349,10 @@ test("follow-up task mutations use ordinary task fields and a source event", () 
       estimatedCostMinor: null,
     }),
     {
-      action: "create_follow_up_task",
-      sourceEventId: "event-1",
+      action: "create_follow_up_item",
+      sourceItemId: "item-1",
       collectionId: "collection-1",
+      type: "task",
       title: "Pay the Ministry of Housing voucher",
       description: "",
       status: "todo",
@@ -359,15 +362,57 @@ test("follow-up task mutations use ordinary task fields and a source event", () 
       contactMentions: [],
     },
   );
+
+  assert.deepEqual(
+    parseMutation({
+      action: "create_follow_up_item",
+      sourceItemId: "item-2",
+      collectionId: "collection-1",
+      type: "event",
+      title: "Voucher review",
+      description: "Review received voucher",
+      occurrenceDate: "2026-08-08",
+      estimatedCostMinor: 1500,
+    }),
+    {
+      action: "create_follow_up_item",
+      sourceItemId: "item-2",
+      collectionId: "collection-1",
+      type: "event",
+      title: "Voucher review",
+      description: "Review received voucher",
+      occurrenceDate: "2026-08-08",
+      estimatedCostMinor: 1500,
+      manualContactIds: [],
+      contactMentions: [],
+    },
+  );
+});
+
+test("follow-up item mutations reject fields from the other destination type", () => {
   assert.throws(
     () =>
       parseMutation({
-        action: "create_follow_up_task",
-        sourceEventId: "event-1",
+        action: "create_follow_up_item",
+        sourceItemId: "item-1",
         collectionId: "collection-1",
-        title: "Pay voucher",
+        type: "task",
+        title: "Task",
         status: "todo",
-        copiedEventDate: "2026-07-19",
+        occurrenceDate: "2026-08-08",
+      }),
+    /unsupported field/i,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_follow_up_item",
+        sourceItemId: "item-1",
+        collectionId: "collection-1",
+        type: "event",
+        title: "Event",
+        occurrenceDate: "2026-08-08",
+        status: "todo",
       }),
     /unsupported field/i,
   );

@@ -270,13 +270,24 @@ export type WorkspaceMutation =
     } & WorkItemContactMutationFields)
   | { action: "delete_item"; itemId: string }
   | ({
-      action: "create_follow_up_task";
-      sourceEventId: string;
+      action: "create_follow_up_item";
+      sourceItemId: string;
       collectionId: string;
+      type: "task";
       title: string;
       description?: string;
       status: TaskStatus;
       dueDate?: string | null;
+      estimatedCostMinor?: number | null;
+    } & WorkItemContactMutationFields)
+  | ({
+      action: "create_follow_up_item";
+      sourceItemId: string;
+      collectionId: string;
+      type: "event";
+      title: string;
+      description?: string;
+      occurrenceDate: string;
       estimatedCostMinor?: number | null;
     } & WorkItemContactMutationFields)
   | {
