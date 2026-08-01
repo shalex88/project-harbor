@@ -70,6 +70,12 @@ test("contact cards collapse from three columns to one without clipping", () => 
   assert.match(styles, /\.contact-details a[\s\S]*?overflow-wrap:\s*anywhere/);
   assert.match(styles, /\.contact-card-heading > div[\s\S]*?min-width:\s*0/);
   assert.match(styles, /\.contact-card-heading h3[\s\S]*?overflow-wrap:\s*anywhere/);
+  const headingParagraphStart = styles.indexOf(".contact-card-heading p,");
+  const headingParagraphRule = styles.slice(
+    headingParagraphStart,
+    styles.indexOf("}", headingParagraphStart) + 1,
+  );
+  assert.match(headingParagraphRule, /overflow-wrap:\s*anywhere/);
   assert.match(styles, /\.contact-actions \.button[\s\S]*?min-height:\s*44px/);
 });
 

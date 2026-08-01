@@ -1576,6 +1576,7 @@ strong.work-item-title {
 .contact-notes {
   color: var(--text-secondary);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .contact-details {
