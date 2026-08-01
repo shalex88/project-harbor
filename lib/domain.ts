@@ -160,6 +160,14 @@ export type WorkspaceMutationResult = {
   createdItemId: string | null;
 };
 
+type ContactMutationFields = {
+  name: string;
+  roleOrCompany: string;
+  email: string;
+  phone: string;
+  notes: string;
+};
+
 export type WorkspaceMutation =
   | {
       action: "create_project";
@@ -176,6 +184,9 @@ export type WorkspaceMutation =
   | { action: "delete_project"; projectId: string }
   | { action: "invite_member"; projectId: string; email: string }
   | { action: "remove_member"; projectId: string; userId: string }
+  | ({ action: "create_contact"; projectId: string } & ContactMutationFields)
+  | ({ action: "update_contact"; contactId: string } & ContactMutationFields)
+  | { action: "delete_contact"; contactId: string }
   | {
       action: "create_collection";
       projectId: string;
@@ -313,12 +324,16 @@ export function requireText(
   return normalized;
 }
 
-export function optionalText(value: unknown, maxLength = 4_000): string {
+export function optionalText(
+  value: unknown,
+  maxLength = 4_000,
+  label = "text",
+): string {
   if (value === undefined || value === null) return "";
-  if (typeof value !== "string") throw new DomainError("invalid text value");
+  if (typeof value !== "string") throw new DomainError(`invalid ${label.toLowerCase()} value`);
   const normalized = value.trim();
   if (normalized.length > maxLength) {
-    throw new DomainError(`text must be ${maxLength} characters or less`);
+    throw new DomainError(`${label} must be ${maxLength} characters or less`);
   }
   return normalized;
 }

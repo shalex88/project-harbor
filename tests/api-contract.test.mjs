@@ -58,6 +58,98 @@ test("project deletion accepts only a project id", () => {
   );
 });
 
+test("contact mutations normalize fixed fields and reject scope changes", () => {
+  assert.deepEqual(
+    parseMutation({
+      action: "create_contact",
+      projectId: "project-1",
+      name: "  Dana Cohen  ",
+      roleOrCompany: " Architect ",
+      email: " dana@example.com ",
+      phone: " +972 50 123 4567 ",
+      notes: " Main planning contact ",
+    }),
+    {
+      action: "create_contact",
+      projectId: "project-1",
+      name: "Dana Cohen",
+      roleOrCompany: "Architect",
+      email: "dana@example.com",
+      phone: "+972 50 123 4567",
+      notes: "Main planning contact",
+    },
+  );
+
+  assert.deepEqual(
+    parseMutation({
+      action: "update_contact",
+      contactId: "contact-1",
+      name: "Dana Cohen",
+    }),
+    {
+      action: "update_contact",
+      contactId: "contact-1",
+      name: "Dana Cohen",
+      roleOrCompany: "",
+      email: "",
+      phone: "",
+      notes: "",
+    },
+  );
+
+  assert.deepEqual(
+    parseMutation({ action: "delete_contact", contactId: "contact-1" }),
+    { action: "delete_contact", contactId: "contact-1" },
+  );
+
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_contact",
+        projectId: "project-1",
+        name: "   ",
+      }),
+    /Contact name is required/,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "create_contact",
+        name: "Dana Cohen",
+      }),
+    /Project is required/,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "update_contact",
+        contactId: "contact-1",
+        projectId: "project-2",
+        name: "Dana Cohen",
+      }),
+    /unsupported field/i,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "update_contact",
+        contactId: "contact-1",
+        name: "Dana Cohen",
+        notes: "x".repeat(2_001),
+      }),
+    /Notes must be 2000 characters or less/,
+  );
+  assert.throws(
+    () =>
+      parseMutation({
+        action: "delete_contact",
+        contactId: "contact-1",
+        name: "Unexpected",
+      }),
+    /unsupported field/i,
+  );
+});
+
 test("events reject task workflow fields", () => {
   assert.throws(
     () =>

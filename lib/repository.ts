@@ -391,6 +391,15 @@ async function projectForCollection(collectionId: string): Promise<string> {
   return row.project_id;
 }
 
+async function projectForContact(contactId: string): Promise<string> {
+  const row = await first<{ project_id: string }>(
+    "SELECT project_id FROM project_contacts WHERE id = ?",
+    contactId,
+  );
+  if (!row) throw new DomainError("Contact not found", "not_found");
+  return row.project_id;
+}
+
 async function authorizedCollectionProject(
   userId: string,
   collectionId: string,
@@ -962,6 +971,46 @@ export async function applyWorkspaceMutation(
         "DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND role = 'member'",
         mutation.projectId,
         mutation.userId,
+      );
+      break;
+    }
+    case "create_contact": {
+      await requireProjectAccess(user.id, mutation.projectId);
+      await run(
+        `INSERT INTO project_contacts
+         (id,project_id,name,role_or_company,email,phone,notes)
+         VALUES (?,?,?,?,?,?,?)`,
+        crypto.randomUUID(),
+        mutation.projectId,
+        requireText(mutation.name, "Contact name", 160),
+        optionalText(mutation.roleOrCompany, 160, "Role or company"),
+        optionalText(mutation.email, 254, "Email"),
+        optionalText(mutation.phone, 80, "Phone"),
+        optionalText(mutation.notes, 2_000, "Notes"),
+      );
+      break;
+    }
+    case "update_contact": {
+      const projectId = await projectForContact(mutation.contactId);
+      await requireProjectAccess(user.id, projectId);
+      await run(
+        `UPDATE project_contacts SET name=?,role_or_company=?,email=?,phone=?,
+         notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        requireText(mutation.name, "Contact name", 160),
+        optionalText(mutation.roleOrCompany, 160, "Role or company"),
+        optionalText(mutation.email, 254, "Email"),
+        optionalText(mutation.phone, 80, "Phone"),
+        optionalText(mutation.notes, 2_000, "Notes"),
+        mutation.contactId,
+      );
+      break;
+    }
+    case "delete_contact": {
+      const projectId = await projectForContact(mutation.contactId);
+      await requireProjectAccess(user.id, projectId);
+      await run(
+        "DELETE FROM project_contacts WHERE id = ?",
+        mutation.contactId,
       );
       break;
     }
