@@ -50,6 +50,18 @@ export type InvitationRecord = {
   createdAt: string;
 };
 
+export type ContactRecord = {
+  id: string;
+  projectId: string;
+  name: string;
+  roleOrCompany: string;
+  email: string;
+  phone: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CollectionRecord = {
   id: string;
   projectId: string;
@@ -136,6 +148,7 @@ export type WorkspaceSnapshot = {
   projects: ProjectRecord[];
   members: MemberRecord[];
   invitations: InvitationRecord[];
+  contacts: ContactRecord[];
   collections: CollectionRecord[];
   items: WorkItemRecord[];
   relations: WorkItemRelationRecord[];

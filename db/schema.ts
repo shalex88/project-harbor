@@ -88,6 +88,28 @@ export const projectInvitations = sqliteTable(
   ],
 );
 
+export const projectContacts = sqliteTable(
+  "project_contacts",
+  {
+    id: text("id").primaryKey(),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    roleOrCompany: text("role_or_company").notNull().default(""),
+    email: text("email").notNull().default(""),
+    phone: text("phone").notNull().default(""),
+    notes: text("notes").notNull().default(""),
+    ...timestamps,
+  },
+  (table) => [
+    index("project_contacts_project_name_idx").on(
+      table.projectId,
+      table.name,
+    ),
+  ],
+);
+
 export const collections = sqliteTable(
   "collections",
   {

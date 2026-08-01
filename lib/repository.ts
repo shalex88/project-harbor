@@ -14,6 +14,7 @@ import {
   validateTaskStatus,
   type AppUser,
   type CollectionRecord,
+  type ContactRecord,
   type InvitationRecord,
   type ItemFileRecord,
   type MemberRecord,
@@ -44,6 +45,7 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS projects (id TEXT PRIMARY KEY NOT NULL, owner_user_id TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', currency TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (owner_user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_members (project_id TEXT NOT NULL, user_id TEXT NOT NULL, role TEXT NOT NULL CHECK(role IN ('owner','member')), joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(project_id,user_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id))`,
   `CREATE TABLE IF NOT EXISTS project_invitations (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, email TEXT NOT NULL, invited_by TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','accepted')), created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, accepted_at TEXT, UNIQUE(project_id,email), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(invited_by) REFERENCES users(id))`,
+  `CREATE TABLE IF NOT EXISTS project_contacts (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, role_or_company TEXT NOT NULL DEFAULT '', email TEXT NOT NULL DEFAULT '', phone TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS collections (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, name TEXT NOT NULL, color TEXT NOT NULL DEFAULT 'cyan', position INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,project_id), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE)`,
   `CREATE TABLE IF NOT EXISTS work_items (id TEXT PRIMARY KEY NOT NULL, project_id TEXT NOT NULL, collection_id TEXT NOT NULL, type TEXT NOT NULL CHECK(type IN ('task','event')), title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', status TEXT CHECK(status IS NULL OR status IN ('todo','done')), due_date TEXT, occurrence_date TEXT, estimated_cost_minor INTEGER CHECK(estimated_cost_minor IS NULL OR estimated_cost_minor >= 0), created_by TEXT NOT NULL, imported_creator_label TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, CHECK((type='task' AND status IS NOT NULL AND occurrence_date IS NULL) OR (type='event' AND status IS NULL AND due_date IS NULL AND occurrence_date IS NOT NULL)), FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE, FOREIGN KEY(collection_id,project_id) REFERENCES collections(id,project_id) ON DELETE CASCADE, FOREIGN KEY(created_by) REFERENCES users(id))`,
   `CREATE UNIQUE INDEX IF NOT EXISTS work_items_id_project_unique ON work_items(id,project_id)`,
@@ -54,6 +56,7 @@ const PREVIEW_SCHEMA = [
   `CREATE TABLE IF NOT EXISTS payment_receipts (payment_id TEXT PRIMARY KEY NOT NULL, file_object_id TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(payment_id) REFERENCES payments(id) ON DELETE CASCADE, FOREIGN KEY(file_object_id) REFERENCES file_objects(id) ON DELETE CASCADE)`,
   `CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members(user_id)`,
   `CREATE INDEX IF NOT EXISTS project_invitations_email_idx ON project_invitations(email,status)`,
+  `CREATE INDEX IF NOT EXISTS project_contacts_project_name_idx ON project_contacts(project_id,name)`,
   `CREATE INDEX IF NOT EXISTS collections_project_position_idx ON collections(project_id,position)`,
   `CREATE INDEX IF NOT EXISTS work_items_collection_idx ON work_items(collection_id)`,
   `CREATE INDEX IF NOT EXISTS work_items_task_filter_idx ON work_items(project_id,type,status,due_date)`,
@@ -203,6 +206,32 @@ async function ensureDevelopmentSeed(user: AppUser): Promise<void> {
         "INSERT INTO collections (id,project_id,name,color,position) VALUES (?,?,?,?,?)",
       )
       .bind("collection-q3-plan", "project-q3-planning", "Operating plan", "amber", 0),
+    db
+      .prepare(
+        "INSERT INTO project_contacts (id,project_id,name,role_or_company,email,phone,notes) VALUES (?,?,?,?,?,?,?)",
+      )
+      .bind(
+        "contact-mobile-research",
+        "project-mobile-launch",
+        "Dana Cohen",
+        "Beta research partner",
+        "dana@example.com",
+        "+1 415 555 0138",
+        "Primary contact for external beta sessions.",
+      ),
+    db
+      .prepare(
+        "INSERT INTO project_contacts (id,project_id,name,role_or_company,email,phone,notes) VALUES (?,?,?,?,?,?,?)",
+      )
+      .bind(
+        "contact-brand-printer",
+        "project-brand-refresh",
+        "Maya Levi",
+        "Print production",
+        "maya@example.com",
+        "+972 50 555 0142",
+        "Coordinates final proofs and production delivery.",
+      ),
   ];
 
   const items = [
@@ -578,6 +607,26 @@ export async function loadWorkspaceSnapshot(
     user.id,
   );
 
+  const contacts = await all<{
+    id: string;
+    project_id: string;
+    name: string;
+    role_or_company: string;
+    email: string;
+    phone: string;
+    notes: string;
+    created_at: string;
+    updated_at: string;
+  }>(
+    `SELECT pc.id,pc.project_id,pc.name,pc.role_or_company,pc.email,pc.phone,
+            pc.notes,pc.created_at,pc.updated_at
+     FROM project_contacts pc
+     JOIN project_members current ON current.project_id = pc.project_id
+     WHERE current.user_id = ?
+     ORDER BY pc.name COLLATE NOCASE,pc.id`,
+    user.id,
+  );
+
   const collections = await all<{
     id: string;
     project_id: string;
@@ -779,6 +828,17 @@ export async function loadWorkspaceSnapshot(
       email: row.email,
       status: "pending",
       createdAt: row.created_at,
+    })),
+    contacts: contacts.map<ContactRecord>((row) => ({
+      id: row.id,
+      projectId: row.project_id,
+      name: row.name,
+      roleOrCompany: row.role_or_company,
+      email: row.email,
+      phone: row.phone,
+      notes: row.notes,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
     })),
     collections: collections.map<CollectionRecord>((row) => ({
       id: row.id,
