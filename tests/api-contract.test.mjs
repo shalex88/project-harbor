@@ -165,6 +165,134 @@ test("events reject task workflow fields", () => {
   );
 });
 
+test("item mutations strictly parse structured contact links and mentions", () => {
+  const contactFields = {
+    manualContactIds: ["contact-dana"],
+    contactMentions: [
+      {
+        contactId: "contact-dana",
+        field: "title",
+        startOffset: 5,
+        endOffset: 10,
+      },
+    ],
+  };
+
+  assert.deepEqual(
+    parseMutation({
+      action: "create_item",
+      collectionId: "collection-1",
+      type: "task",
+      title: "Call @Dana",
+      description: "",
+      status: "todo",
+      dueDate: null,
+      estimatedCostMinor: null,
+      ...contactFields,
+    }),
+    {
+      action: "create_item",
+      collectionId: "collection-1",
+      type: "task",
+      title: "Call @Dana",
+      description: "",
+      status: "todo",
+      dueDate: null,
+      estimatedCostMinor: null,
+      ...contactFields,
+    },
+  );
+
+  assert.deepEqual(
+    parseMutation({
+      action: "create_item",
+      collectionId: "collection-1",
+      type: "event",
+      title: "פגישה",
+      occurrenceDate: "2026-08-02",
+    }),
+    {
+      action: "create_item",
+      collectionId: "collection-1",
+      type: "event",
+      title: "פגישה",
+      description: "",
+      occurrenceDate: "2026-08-02",
+      estimatedCostMinor: undefined,
+      manualContactIds: [],
+      contactMentions: [],
+    },
+  );
+
+  assert.deepEqual(
+    parseMutation({
+      action: "update_item",
+      itemId: "task-1",
+      type: "task",
+      title: "Call @Dana",
+      status: "todo",
+      ...contactFields,
+    }).contactMentions,
+    contactFields.contactMentions,
+  );
+
+  assert.deepEqual(
+    parseMutation({
+      action: "create_follow_up_task",
+      sourceEventId: "event-1",
+      collectionId: "collection-1",
+      title: "Call @Dana",
+      status: "todo",
+      ...contactFields,
+    }).manualContactIds,
+    contactFields.manualContactIds,
+  );
+
+  for (const [field, value, message] of [
+    ["manualContactIds", "contact-dana", /must be an array/i],
+    ["contactMentions", {}, /must be an array/i],
+    ["manualContactIds", ["contact-dana", "contact-dana"], /duplicates/i],
+  ]) {
+    assert.throws(
+      () =>
+        parseMutation({
+          action: "create_item",
+          collectionId: "collection-1",
+          type: "task",
+          title: "Call @Dana",
+          status: "todo",
+          [field]: value,
+        }),
+      message,
+    );
+  }
+
+  for (const mention of [
+    { contactId: "contact-dana", field: "notes", startOffset: 5, endOffset: 10 },
+    { contactId: "contact-dana", field: "title", startOffset: -1, endOffset: 10 },
+    { contactId: "contact-dana", field: "title", startOffset: 5.5, endOffset: 10 },
+    { contactId: "contact-dana", field: "title", startOffset: 5, endOffset: 5 },
+    {
+      contactId: "contact-dana",
+      field: "title",
+      startOffset: 5,
+      endOffset: 10,
+      label: "Dana",
+    },
+  ]) {
+    assert.throws(() =>
+      parseMutation({
+        action: "create_item",
+        collectionId: "collection-1",
+        type: "task",
+        title: "Call @Dana",
+        status: "todo",
+        contactMentions: [mention],
+      }),
+    );
+  }
+});
+
 test("relationship mutations accept fixed types and canonicalize symmetric links", () => {
   assert.deepEqual(
     parseMutation({
@@ -227,6 +355,8 @@ test("follow-up task mutations use ordinary task fields and a source event", () 
       status: "todo",
       dueDate: null,
       estimatedCostMinor: null,
+      manualContactIds: [],
+      contactMentions: [],
     },
   );
   assert.throws(

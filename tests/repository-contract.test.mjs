@@ -94,6 +94,31 @@ test("workspace snapshots load membership-scoped contacts in name order", () => 
   assert.match(repository, /contacts: contacts\.map<ContactRecord>/);
 });
 
+test("workspace snapshots load stable project-scoped item contact metadata", () => {
+  assert.match(repository, /const contactLinkRows = await all/);
+  assert.match(repository, /FROM work_item_contacts wic/);
+  assert.match(repository, /const contactMentionRows = await all/);
+  assert.match(repository, /FROM work_item_contact_mentions wicm/);
+  assert.match(
+    repository,
+    /JOIN project_members current ON current\.project_id = wic\.project_id/,
+  );
+  assert.match(
+    repository,
+    /JOIN project_members current ON current\.project_id = wicm\.project_id/,
+  );
+  assert.match(repository, /ORDER BY wic\.item_id,wic\.contact_id/);
+  assert.match(
+    repository,
+    /ORDER BY wicm\.item_id,wicm\.field,wicm\.start_offset,wicm\.end_offset,wicm\.id/,
+  );
+  assert.match(repository, /contactLinks: contactLinksByItem\.get\(row\.id\) \?\? \[\]/);
+  assert.match(
+    repository,
+    /contactMentions: contactMentionsByItem\.get\(row\.id\) \?\? \[\]/,
+  );
+});
+
 test("preview persistence and seed data use only todo and done task states", () => {
   assert.match(repository, /status IN \('todo','done'\)/);
   assert.doesNotMatch(repository, /status IN \('todo','in_progress','done'\)/);

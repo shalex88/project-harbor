@@ -138,6 +138,8 @@ type WorkItemBase = {
   updatedAt: string;
   files: ItemFileRecord[];
   payments: PaymentRecord[];
+  contactLinks: WorkItemContactLinkRecord[];
+  contactMentions: WorkItemContactMentionRecord[];
 };
 
 export type TaskRecord = WorkItemBase & {
