@@ -10,6 +10,10 @@ const relationPersistence = await readFile(
   new URL("../lib/relation-persistence.ts", import.meta.url),
   "utf8",
 );
+const followUpPersistence = await readFile(
+  new URL("../lib/follow-up-persistence.ts", import.meta.url),
+  "utf8",
+);
 
 test("duplicate pending invitations produce a conflict", () => {
   assert.match(
@@ -58,19 +62,14 @@ test("follow-up creation authorizes generic source and collection before compari
   );
   assert.match(
     followUpCase,
-    /authorizedRelationItem\(\s*user\.id,\s*mutation\.sourceItemId/,
-  );
-  assert.match(
-    followUpCase,
-    /authorizedCollectionProject\(\s*user\.id,\s*mutation\.collectionId/,
+    /loadAuthorizedFollowUpContext\(\s*db,\s*user\.id,\s*mutation\.sourceItemId,\s*mutation\.collectionId/,
   );
   assert.doesNotMatch(followUpCase, /source\.type\s*!==\s*"event"/);
-  assert.ok(
-    followUpCase.indexOf("authorizedCollectionProject") <
-      followUpCase.indexOf(
-        "Follow-up item collection must belong to the source project",
-      ),
-  );
+  assert.match(followUpCase, /context\.status === "source_not_found"/);
+  assert.match(followUpCase, /context\.status === "collection_not_found"/);
+  assert.match(followUpCase, /context\.status === "project_mismatch"/);
+  assert.match(followUpPersistence, /JOIN project_members current/);
+  assert.match(followUpPersistence, /collection\.project_id !== source\.project_id/);
 });
 
 test("follow-up creation inserts either item type and batches the relation", () => {
@@ -79,13 +78,15 @@ test("follow-up creation inserts either item type and batches the relation", () 
     repository.indexOf('case "create_relation"'),
   );
   assert.match(followUpCase, /mutation\.type === "task"/);
-  assert.match(followUpCase, /'task'/);
-  assert.match(followUpCase, /'event'/);
-  assert.match(followUpCase, /source\.id,\s*itemId/);
-  assert.match(followUpCase, /'follows_from'/);
   assert.match(followUpCase, /appendContactStateStatements\(statements/);
-  assert.match(followUpCase, /await db\.batch\(statements\)/);
+  assert.match(followUpCase, /await persistFollowUpItem\(/);
+  assert.match(followUpCase, /sourceItemId: source\.id/);
+  assert.match(followUpCase, /statements,\s*\);/);
   assert.match(followUpCase, /createdItemId = itemId/);
+  assert.match(followUpPersistence, /VALUES \(\?,\?,\?,'task'/);
+  assert.match(followUpPersistence, /VALUES \(\?,\?,\?,'event'/);
+  assert.match(followUpPersistence, /'follows_from'/);
+  assert.match(followUpPersistence, /await db\.batch\(\[/);
 });
 
 test("workspace snapshots load authorized relationship records", () => {

@@ -111,7 +111,7 @@ export function FollowUpMenu({
         onKeyDownCapture={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
-            openMenu(event.key === "ArrowUp" ? 1 : 0);
+            openMenu(0);
           } else if (open) {
             handleFollowUpMenuEscape(event, dismiss);
           }

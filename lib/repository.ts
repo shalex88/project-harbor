@@ -41,6 +41,10 @@ import {
 } from "./contact-persistence";
 import { createFileRenameService } from "./file-rename-service";
 import {
+  loadAuthorizedFollowUpContext,
+  persistFollowUpItem,
+} from "./follow-up-persistence";
+import {
   DIRECTED_RELATION_INSERT_SQL,
   directedRelationInsertParams,
   isRelationUniqueConstraint,
@@ -422,25 +426,6 @@ async function authorizedContactProject(
     contactId,
   );
   if (!projectId) throw new DomainError("Contact not found", "not_found");
-  return projectId;
-}
-
-async function authorizedCollectionProject(
-  userId: string,
-  collectionId: string,
-): Promise<string> {
-  const projectId = await projectForCollection(collectionId);
-  try {
-    await requireProjectAccess(userId, projectId);
-  } catch (error) {
-    if (
-      error instanceof DomainError &&
-      (error.code === "not_found" || error.code === "forbidden")
-    ) {
-      throw new DomainError("Collection not found", "not_found");
-    }
-    throw error;
-  }
   return projectId;
 }
 
@@ -1399,19 +1384,25 @@ export async function applyWorkspaceMutation(
       break;
     }
     case "create_follow_up_item": {
-      const source = await authorizedRelationItem(
+      const db = getRawD1();
+      const context = await loadAuthorizedFollowUpContext(
+        db,
         user.id,
         mutation.sourceItemId,
-      );
-      const collectionProjectId = await authorizedCollectionProject(
-        user.id,
         mutation.collectionId,
       );
-      if (collectionProjectId !== source.projectId) {
+      if (context.status === "source_not_found") {
+        throw new DomainError("Item not found", "not_found");
+      }
+      if (context.status === "collection_not_found") {
+        throw new DomainError("Collection not found", "not_found");
+      }
+      if (context.status === "project_mismatch") {
         throw new DomainError(
           "Follow-up item collection must belong to the source project",
         );
       }
+      const source = context.source;
       const itemId = crypto.randomUUID();
       const title = requireText(
         mutation.title,
@@ -1432,67 +1423,43 @@ export async function applyWorkspaceMutation(
         contactMentions: mutation.contactMentions ?? [],
         contacts: await projectContactIdentities(source.projectId),
       });
-      const db = getRawD1();
       const statements: D1PreparedStatement[] = [];
-      if (mutation.type === "task") {
-        statements.push(
-          db
-            .prepare(
-              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
-               VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
-            )
-            .bind(
-              itemId,
-              source.projectId,
-              mutation.collectionId,
-              title,
-              description,
-              validateTaskStatus(mutation.status),
-              validateOptionalIsoDate(mutation.dueDate, "Due date"),
-              estimate,
-              user.id,
-            ),
-        );
-      } else {
-        statements.push(
-          db
-            .prepare(
-              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
-               VALUES (?,?,?,'event',?,?,NULL,NULL,?,?,?)`,
-            )
-            .bind(
-              itemId,
-              source.projectId,
-              mutation.collectionId,
-              title,
-              description,
-              validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
-              estimate,
-              user.id,
-            ),
-        );
-      }
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO work_item_relations (id,project_id,source_item_id,target_item_id,type,created_by)
-             VALUES (?,?,?,?, 'follows_from',?)`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            source.projectId,
-            source.id,
-            itemId,
-            user.id,
-          ),
-      );
       appendContactStateStatements(statements, db, {
         itemId,
         projectId: source.projectId,
         state,
         replace: false,
       });
-      await db.batch(statements);
+      const persistenceBase = {
+        itemId,
+        relationId: crypto.randomUUID(),
+        sourceItemId: source.id,
+        projectId: source.projectId,
+        collectionId: mutation.collectionId,
+        createdBy: user.id,
+        title,
+        description,
+        estimatedCostMinor: estimate,
+      };
+      await persistFollowUpItem(
+        db,
+        mutation.type === "task"
+          ? {
+              ...persistenceBase,
+              type: "task",
+              status: validateTaskStatus(mutation.status),
+              dueDate: validateOptionalIsoDate(mutation.dueDate, "Due date"),
+            }
+          : {
+              ...persistenceBase,
+              type: "event",
+              occurrenceDate: validateIsoDate(
+                mutation.occurrenceDate,
+                "Occurrence date",
+              ),
+            },
+        statements,
+      );
       createdItemId = itemId;
       break;
     }
