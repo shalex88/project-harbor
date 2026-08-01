@@ -15,6 +15,25 @@ import { createPortal } from "react-dom";
 import type { ContactRecord } from "@/lib/domain";
 import { Modal } from "./ui";
 
+const ISRAEL_COUNTRY_CODE = "972";
+
+export function whatsappMessageHref(phone: string): string | null {
+  const trimmed = phone.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  if (!digits) return null;
+
+  let internationalNumber = digits;
+  if (trimmed.startsWith("00")) {
+    internationalNumber = digits.slice(2);
+  } else if (!trimmed.startsWith("+") && digits.startsWith("0")) {
+    internationalNumber = `${ISRAEL_COUNTRY_CODE}${digits.slice(1)}`;
+  }
+
+  return internationalNumber
+    ? `https://wa.me/${internationalNumber}`
+    : null;
+}
+
 export function ContactDetailsModal({
   contact,
   open,
@@ -48,32 +67,24 @@ export function ContactDetailsModal({
             </span>
           ) : null}
         </div>
-        <div className="contact-detail-actions">
-          {contact.phone ? (
-            <a className="button button-secondary" href={`tel:${contact.phone}`}>
-              Call
-            </a>
-          ) : null}
-          {contact.email ? (
-            <a className="button button-secondary" href={`mailto:${contact.email}`}>
-              Email
-            </a>
-          ) : null}
-          {!contact.phone && !contact.email ? (
-            <span className="muted">No phone number or email address</span>
-          ) : null}
-        </div>
         {contact.phone ? (
           <p>
             <span>Phone</span>
-            <bdi dir="ltr">{contact.phone}</bdi>
+            <a href={`tel:${contact.phone}`}>
+              <bdi dir="ltr">{contact.phone}</bdi>
+            </a>
           </p>
         ) : null}
         {contact.email ? (
           <p>
             <span>Email</span>
-            <bdi dir="ltr">{contact.email}</bdi>
+            <a href={`mailto:${contact.email}`}>
+              <bdi dir="ltr">{contact.email}</bdi>
+            </a>
           </p>
+        ) : null}
+        {!contact.phone && !contact.email ? (
+          <span className="muted">No phone number or email address</span>
         ) : null}
         {contact.notes ? (
           <p>
@@ -235,6 +246,9 @@ export function ContactActionTrigger({
       focusAdjacentControl(event.shiftKey);
     }
   };
+  const messageHref = contact.phone
+    ? whatsappMessageHref(contact.phone)
+    : null;
 
   return (
     <span className="contact-action" ref={containerRef}>
@@ -293,6 +307,22 @@ export function ContactActionTrigger({
               }}
             >
               Call
+            </a>
+          ) : null}
+          {messageHref ? (
+            <a
+              role="menuitem"
+              tabIndex={-1}
+              href={messageHref}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Message ${contact.name} on WhatsApp`}
+              onClick={(event) => {
+                stopRowActivation(event);
+                setMenuOpen(false);
+              }}
+            >
+              Message
             </a>
           ) : null}
           {contact.email ? (

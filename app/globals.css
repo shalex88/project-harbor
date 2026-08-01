@@ -1746,17 +1746,24 @@ strong.work-item-title {
   font-size: 12px;
 }
 
-.contact-detail-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.contact-details-modal p > a {
+  width: fit-content;
+  color: var(--cyan);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.contact-details-modal p > a:hover,
+.contact-details-modal p > a:focus-visible {
+  color: var(--seafoam);
 }
 
 .mention-editor {
   position: relative;
 }
 
-.mention-editor-input {
+.mention-editor-input,
+.mention-editor-preview {
   width: 100%;
   min-height: 44px;
   overflow-wrap: anywhere;
@@ -1766,12 +1773,18 @@ strong.work-item-title {
   background: var(--shell);
   color: var(--text);
   padding: 10px 12px;
+  font: inherit;
+  text-align: start;
   white-space: pre-wrap;
-  unicode-bidi: plaintext;
+}
+
+.mention-editor-input[data-multiline="true"],
+.mention-editor-preview[data-multiline="true"] {
+  min-height: 104px;
 }
 
 .mention-editor-input[data-multiline="true"] {
-  min-height: 104px;
+  resize: vertical;
 }
 
 .mention-editor-input:focus {
@@ -1779,9 +1792,35 @@ strong.work-item-title {
   box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.12);
 }
 
-.contact-mention-editor-token {
-  display: inline;
-  unicode-bidi: isolate;
+.mention-editor-preview {
+  position: relative;
+}
+
+.mention-editor-preview-edit-target {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: text;
+}
+
+.mention-editor-preview-edit-target:hover,
+.mention-editor-preview-edit-target:focus-visible {
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.12);
+  outline: 1px solid var(--seafoam);
+}
+
+.mention-editor-preview-content {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.mention-editor-preview .contact-action {
+  pointer-events: auto;
 }
 
 .mention-picker {

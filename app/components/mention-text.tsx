@@ -3,7 +3,19 @@ import type {
   ContactRecord,
   WorkItemContactMentionRecord,
 } from "@/lib/domain";
+import { mentionContactLabel } from "@/lib/work-item-contacts";
 import { ContactActionTrigger } from "./contact-actions";
+
+const RTL_SCRIPT_PATTERN = /[\p{Script=Hebrew}\p{Script=Arabic}]/u;
+const LETTER_PATTERN = /\p{L}/u;
+
+function textDirection(text: string): "ltr" | "rtl" {
+  for (const character of text) {
+    if (RTL_SCRIPT_PATTERN.test(character)) return "rtl";
+    if (LETTER_PATTERN.test(character)) return "ltr";
+  }
+  return "ltr";
+}
 
 export function MentionText({
   text,
@@ -13,7 +25,10 @@ export function MentionText({
 }: {
   text: string;
   field: ContactMentionField;
-  mentions: WorkItemContactMentionRecord[];
+  mentions: Pick<
+    WorkItemContactMentionRecord,
+    "id" | "contactId" | "field" | "startOffset" | "endOffset"
+  >[];
   contacts: ContactRecord[];
 }) {
   const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
@@ -27,6 +42,7 @@ export function MentionText({
     );
   const parts = [];
   let cursor = 0;
+  let visibleText = "";
 
   for (const mention of ordered) {
     if (
@@ -39,43 +55,42 @@ export function MentionText({
       continue;
     }
     if (mention.startOffset > cursor) {
-      parts.push(
-        <bdi dir="auto" key={`text-${cursor}`}>
-          {text.slice(cursor, mention.startOffset)}
-        </bdi>,
-      );
+      const leading = text.slice(cursor, mention.startOffset);
+      parts.push(leading);
+      visibleText += leading;
     }
     const storedLabel = text.slice(mention.startOffset, mention.endOffset);
     const contact = contactsById.get(mention.contactId);
     if (contact && storedLabel.startsWith("@")) {
+      const label = mentionContactLabel(contact);
       parts.push(
         <ContactActionTrigger
           contact={contact}
-          label={`@${contact.name}`}
+          label={label}
           className="contact-mention-trigger"
           key={mention.id}
         />,
       );
+      visibleText += label;
     } else {
       parts.push(
         <bdi dir="auto" key={mention.id}>
           {storedLabel}
         </bdi>,
       );
+      visibleText += storedLabel;
     }
     cursor = mention.endOffset;
   }
 
   if (cursor < text.length || parts.length === 0) {
-    parts.push(
-      <bdi dir="auto" key={`text-${cursor}`}>
-        {text.slice(cursor)}
-      </bdi>,
-    );
+    const trailing = text.slice(cursor);
+    parts.push(trailing);
+    visibleText += trailing;
   }
 
   return (
-    <span className="mention-text" dir="auto">
+    <span className="mention-text" dir={textDirection(visibleText)}>
       {parts}
     </span>
   );

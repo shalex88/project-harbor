@@ -3,14 +3,14 @@
 import {
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ChangeEvent,
   type ClipboardEvent,
-  type FormEvent,
   type KeyboardEvent,
   type ReactElement,
-  type ReactNode,
 } from "react";
 import type { ContactRecord } from "@/lib/domain";
 import {
@@ -22,136 +22,26 @@ import {
   type MentionEditorValue,
   type MentionQuery,
 } from "@/lib/work-item-contacts";
-import { ContactActionTrigger } from "./contact-actions";
+import { MentionText } from "./mention-text";
 
+type NativeEditor = HTMLInputElement | HTMLTextAreaElement;
 type PickerPosition = { top: number; left: number };
 
-function readEditorValue(root: HTMLElement): MentionEditorValue {
-  let text = "";
-  const mentions: MentionEditorValue["mentions"] = [];
-
-  const readNode = (node: Node): void => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      text += node.textContent ?? "";
-      return;
-    }
-    if (!(node instanceof HTMLElement)) return;
-    if (node.dataset.contactId) {
-      const label = node.dataset.contactLabel ?? node.textContent ?? "";
-      const startOffset = text.length;
-      text += label;
-      mentions.push({
-        contactId: node.dataset.contactId,
-        startOffset,
-        endOffset: text.length,
-      });
-      return;
-    }
-    if (node.tagName === "BR") {
-      text += "\n";
-      return;
-    }
-    for (const child of node.childNodes) readNode(child);
-  };
-
-  for (const child of root.childNodes) readNode(child);
-  return { text, mentions };
-}
-
-function currentCaretOffset(root: HTMLElement): number | null {
-  const offsets = currentSelectionOffsets(root);
-  return offsets && offsets.startOffset === offsets.endOffset
-    ? offsets.startOffset
-    : null;
-}
-
-function currentSelectionOffsets(
-  root: HTMLElement,
-): { startOffset: number; endOffset: number } | null {
-  const selection = window.getSelection();
-  if (!selection?.rangeCount) return null;
-  const range = selection.getRangeAt(0);
-  if (
-    !root.contains(range.startContainer) ||
-    !root.contains(range.endContainer)
-  ) {
-    return null;
-  }
-  const prefix = document.createRange();
-  prefix.selectNodeContents(root);
-  prefix.setEnd(range.startContainer, range.startOffset);
-  const startOffset = prefix.toString().length;
-  prefix.setEnd(range.endContainer, range.endOffset);
-  return { startOffset, endOffset: prefix.toString().length };
-}
-
-function setCaretOffset(root: HTMLElement, offset: number): void {
-  const selection = window.getSelection();
-  if (!selection) return;
-  const range = document.createRange();
-  let consumed = 0;
-
-  for (const child of root.childNodes) {
-    const element = child instanceof HTMLElement ? child : null;
-    const length = element?.dataset.contactLabel?.length ?? child.textContent?.length ?? 0;
-    if (element?.dataset.contactId) {
-      if (offset <= consumed) {
-        range.setStartBefore(child);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return;
-      }
-      if (offset <= consumed + length) {
-        range.setStartAfter(child);
-        range.collapse(true);
-        selection.removeAllRanges();
-        selection.addRange(range);
-        return;
-      }
-    } else if (offset <= consumed + length) {
-      const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
-      let localOffset = offset - consumed;
-      let textNode = walker.nextNode();
-      while (textNode) {
-        const nodeLength = textNode.textContent?.length ?? 0;
-        if (localOffset <= nodeLength) {
-          range.setStart(textNode, localOffset);
-          range.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(range);
-          return;
-        }
-        localOffset -= nodeLength;
-        textNode = walker.nextNode();
-      }
-    }
-    consumed += length;
-  }
-
-  range.selectNodeContents(root);
-  range.collapse(false);
-  selection.removeAllRanges();
-  selection.addRange(range);
-}
-
 function pickerPosition(
-  root: HTMLElement,
+  root: NativeEditor,
   picker: HTMLElement | null = null,
 ): PickerPosition {
-  const selection = window.getSelection();
-  const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-  const rect = range?.getBoundingClientRect();
-  const anchor = rect && (rect.width || rect.height)
-    ? rect
-    : root.getBoundingClientRect();
+  const anchor = root.getBoundingClientRect();
   const margin = 12;
   const gap = 6;
   const pickerBox = picker?.getBoundingClientRect();
   const width = pickerBox?.width ?? Math.min(360, window.innerWidth - 24);
   const height = pickerBox?.height ?? Math.min(320, window.innerHeight / 2);
+  const direction = window.getComputedStyle(root).direction;
+  const preferredLeft =
+    direction === "rtl" ? anchor.right - width : anchor.left;
   const left = Math.min(
-    Math.max(anchor.left, margin),
+    Math.max(preferredLeft, margin),
     Math.max(margin, window.innerWidth - width - margin),
   );
   const below = anchor.bottom + gap;
@@ -161,60 +51,6 @@ function pickerPosition(
       ? below
       : Math.max(margin, above);
   return { top, left };
-}
-
-function editorParts(
-  value: MentionEditorValue,
-  contacts: ContactRecord[],
-): ReactNode[] {
-  const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
-  const parts: ReactNode[] = [];
-  let cursor = 0;
-  for (const mention of [...value.mentions].sort(
-    (left, right) => left.startOffset - right.startOffset,
-  )) {
-    const contact = contactsById.get(mention.contactId);
-    if (
-      !contact ||
-      mention.startOffset < cursor ||
-      mention.endOffset <= mention.startOffset ||
-      mention.endOffset > value.text.length
-    ) {
-      continue;
-    }
-    if (mention.startOffset > cursor) {
-      parts.push(
-        <bdi dir="auto" key={`text-${cursor}`}>
-          {value.text.slice(cursor, mention.startOffset)}
-        </bdi>,
-      );
-    }
-    const label = `@${contact.name}`;
-    parts.push(
-      <span
-        className="contact-mention-editor-token"
-        contentEditable={false}
-        data-contact-id={contact.id}
-        data-contact-label={label}
-        key={`${contact.id}-${mention.startOffset}`}
-      >
-        <ContactActionTrigger
-          contact={contact}
-          label={label}
-          className="contact-mention-trigger contact-mention"
-        />
-      </span>,
-    );
-    cursor = mention.endOffset;
-  }
-  if (cursor < value.text.length || parts.length === 0) {
-    parts.push(
-      <bdi dir="auto" key={`text-${cursor}`}>
-        {value.text.slice(cursor)}
-      </bdi>,
-    );
-  }
-  return parts;
 }
 
 export function ContactMentionEditor({
@@ -232,11 +68,14 @@ export function ContactMentionEditor({
   maxLength: number;
   onChange: (value: MentionEditorValue) => void;
 }): ReactElement {
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<NativeEditor>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const isComposing = useRef(false);
   const pendingCaret = useRef<number | null>(null);
+  const pendingEditorFocus = useRef(false);
+  const latestValueRef = useRef(value);
   const listboxId = useId();
+  const [isEditing, setIsEditing] = useState(false);
   const [query, setQuery] = useState<MentionQuery | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [position, setPosition] = useState<PickerPosition>({ top: 0, left: 0 });
@@ -244,16 +83,37 @@ export function ContactMentionEditor({
     () => (query ? rankMentionContacts(contacts, query.query) : []),
     [contacts, query],
   );
+  const previewMentions = useMemo(
+    () =>
+      value.mentions.map((mention, index) => ({
+        ...mention,
+        id: `${listboxId}-preview-${index}`,
+        field: "title" as const,
+      })),
+    [listboxId, value.mentions],
+  );
+  const hasInteractiveMention = useMemo(() => {
+    const contactIds = new Set(contacts.map((contact) => contact.id));
+    return value.mentions.some((mention) => contactIds.has(mention.contactId));
+  }, [contacts, value.mentions]);
 
-  useEffect(() => {
-    if (pendingCaret.current === null || !editorRef.current) return;
+  useLayoutEffect(() => {
+    latestValueRef.current = value;
+    const editor = editorRef.current;
+    if (!editor) return;
+    if (pendingEditorFocus.current) {
+      pendingEditorFocus.current = false;
+      const offset = pendingCaret.current ?? editor.value.length;
+      pendingCaret.current = null;
+      editor.focus();
+      editor.setSelectionRange(offset, offset);
+      return;
+    }
+    if (pendingCaret.current === null) return;
     const offset = pendingCaret.current;
     pendingCaret.current = null;
-    const frame = requestAnimationFrame(() => {
-      if (editorRef.current) setCaretOffset(editorRef.current, offset);
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [value]);
+    editor.setSelectionRange(offset, offset);
+  }, [isEditing, value]);
 
   const closePicker = () => {
     setQuery(null);
@@ -288,8 +148,13 @@ export function ContactMentionEditor({
     };
   }, [query]);
 
-  const updatePicker = (nextValue: MentionEditorValue, caretOffset: number | null) => {
-    if (isComposing.current || caretOffset === null || !editorRef.current) return;
+  const updatePicker = (
+    nextValue: MentionEditorValue,
+    caretOffset: number | null,
+  ) => {
+    if (isComposing.current || caretOffset === null || !editorRef.current) {
+      return;
+    }
     const nextQuery = findMentionQuery(
       nextValue.text,
       caretOffset,
@@ -300,96 +165,104 @@ export function ContactMentionEditor({
     if (nextQuery) setPosition(pickerPosition(editorRef.current));
   };
 
-  const normalizedDomValue = (): MentionEditorValue | null => {
-    if (!editorRef.current) return null;
-    const parsed = readEditorValue(editorRef.current);
-    const next =
-      parsed.mentions.length > 0 || value.mentions.length === 0
-        ? parsed
-        : reconcileMentionText(value, parsed.text);
-    const text = next.text.slice(0, maxLength);
-    return {
-      text,
-      mentions: next.mentions.filter((mention) => mention.endOffset <= text.length),
-    };
-  };
-
-  const syncFromDom = (updateMentionPicker = true) => {
-    const next = normalizedDomValue();
-    if (!next || !editorRef.current) return;
-    const caretOffset = Math.min(
-      currentCaretOffset(editorRef.current) ?? next.text.length,
-      next.text.length,
-    );
-    pendingCaret.current = caretOffset;
+  const handleChange = (event: ChangeEvent<NativeEditor>) => {
+    const text = event.currentTarget.value;
+    const next = reconcileMentionText(latestValueRef.current, text);
+    const caretOffset = event.currentTarget.selectionStart ?? text.length;
+    latestValueRef.current = next;
     onChange(next);
-    if (updateMentionPicker) updatePicker(next, caretOffset);
+    if (!isComposing.current) updatePicker(next, caretOffset);
   };
 
   const chooseContact = (contact: ContactRecord) => {
     if (!query) return;
-    const inserted = insertContactMention(value, query, contact);
+    const inserted = insertContactMention(
+      latestValueRef.current,
+      query,
+      contact,
+    );
+    latestValueRef.current = inserted.value;
     pendingCaret.current = inserted.caretOffset;
     onChange(inserted.value);
     closePicker();
   };
 
   const applyTextEdit = (replacement: string): boolean => {
-    if (!editorRef.current) return false;
-    const offsets = currentSelectionOffsets(editorRef.current);
-    if (!offsets) return false;
-    const retainedLength =
-      value.text.length - (offsets.endOffset - offsets.startOffset);
+    const editor = editorRef.current;
+    if (!editor) return false;
+    const startOffset = editor.selectionStart;
+    const endOffset = editor.selectionEnd;
+    if (startOffset === null || endOffset === null) return false;
+    const current = latestValueRef.current;
+    const retainedLength = current.text.length - (endOffset - startOffset);
     const acceptedReplacement = replacement.slice(
       0,
       Math.max(0, maxLength - retainedLength),
     );
     const next = replaceMentionText(
-      value,
-      offsets.startOffset,
-      offsets.endOffset,
+      current,
+      startOffset,
+      endOffset,
       acceptedReplacement,
     );
-    const caretOffset = offsets.startOffset + acceptedReplacement.length;
+    const caretOffset = startOffset + acceptedReplacement.length;
+    latestValueRef.current = next;
     pendingCaret.current = caretOffset;
     onChange(next);
     updatePicker(next, caretOffset);
     return true;
   };
 
-  const removeBoundaryMention = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (!editorRef.current || !window.getSelection()?.isCollapsed) return false;
-    const caretOffset = currentCaretOffset(editorRef.current);
-    if (caretOffset === null) return false;
-    const mention = value.mentions.find((candidate) =>
+  const removeBoundaryMention = (event: KeyboardEvent<NativeEditor>) => {
+    const editor = editorRef.current;
+    if (!editor) return false;
+    const startOffset = editor.selectionStart;
+    const endOffset = editor.selectionEnd;
+    if (
+      startOffset === null ||
+      endOffset === null ||
+      startOffset !== endOffset
+    ) {
+      return false;
+    }
+    const current = latestValueRef.current;
+    const mention = current.mentions.find((candidate) =>
       event.key === "Backspace"
-        ? candidate.endOffset === caretOffset
-        : candidate.startOffset === caretOffset,
+        ? candidate.endOffset === startOffset
+        : candidate.startOffset === startOffset,
     );
     if (!mention) return false;
     event.preventDefault();
-    const nextText =
-      value.text.slice(0, mention.startOffset) + value.text.slice(mention.endOffset);
-    const next = reconcileMentionText(value, nextText);
+    const next = replaceMentionText(
+      current,
+      mention.startOffset,
+      mention.endOffset,
+      "",
+    );
+    latestValueRef.current = next;
     pendingCaret.current = mention.startOffset;
     onChange(next);
     closePicker();
     return true;
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = (event: KeyboardEvent<NativeEditor>) => {
     if (event.key === "Backspace" || event.key === "Delete") {
       if (removeBoundaryMention(event)) return;
     }
     if (query && event.key === "ArrowDown") {
       event.preventDefault();
-      setActiveIndex((index) => (results.length ? (index + 1) % results.length : 0));
+      setActiveIndex((index) =>
+        results.length ? (index + 1) % results.length : 0,
+      );
       return;
     }
     if (query && event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex((index) =>
-        results.length ? (index - 1 + results.length) % results.length : 0,
+        results.length
+          ? (index - 1 + results.length) % results.length
+          : 0,
       );
       return;
     }
@@ -407,7 +280,7 @@ export function ContactMentionEditor({
     if (!multiline && event.key === "Enter") event.preventDefault();
   };
 
-  const handlePaste = (event: ClipboardEvent<HTMLDivElement>) => {
+  const handlePaste = (event: ClipboardEvent<NativeEditor>) => {
     event.preventDefault();
     const plainText = event.clipboardData
       .getData("text/plain")
@@ -417,79 +290,138 @@ export function ContactMentionEditor({
 
   const handleCompositionEnd = () => {
     isComposing.current = false;
-    requestAnimationFrame(() => syncFromDom(true));
+    requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      if (editor) {
+        updatePicker(latestValueRef.current, editor.selectionStart);
+      }
+    });
   };
 
   const handleSelection = () => {
-    if (!isComposing.current && editorRef.current) {
-      updatePicker(value, currentCaretOffset(editorRef.current));
+    const editor = editorRef.current;
+    if (!isComposing.current && editor) {
+      updatePicker(latestValueRef.current, editor.selectionStart);
     }
   };
+
+  const handleBlur = () => {
+    requestAnimationFrame(() => {
+      const active = document.activeElement;
+      if (
+        active &&
+        !editorRef.current?.contains(active) &&
+        !pickerRef.current?.contains(active)
+      ) {
+        closePicker();
+        setIsEditing(false);
+      }
+    });
+  };
+
+  const beginEditing = () => {
+    pendingEditorFocus.current = true;
+    setIsEditing(true);
+  };
+
+  const activeDescendant =
+    query && results[activeIndex]
+      ? `${listboxId}-option-${results[activeIndex].id}`
+      : undefined;
+  const showPreview = !isEditing && hasInteractiveMention;
 
   return (
     <div className="field mention-editor-field">
       <span className="field-label">{label}</span>
       <div className="mention-editor">
-        <div
-          ref={editorRef}
-          className="mention-editor-input"
-          role="combobox"
-          contentEditable
-          suppressContentEditableWarning
-          dir="auto"
-          aria-label={label}
-          aria-autocomplete="list"
-          aria-expanded={query !== null}
-          aria-haspopup="listbox"
-          aria-controls={query ? listboxId : undefined}
-          aria-activedescendant={
-            query && results[activeIndex]
-              ? `${listboxId}-option-${results[activeIndex].id}`
-              : undefined
-          }
-          data-multiline={multiline}
-          data-max-length={maxLength}
-          onBeforeInput={(event: FormEvent<HTMLDivElement>) => {
-            const inputType = (event.nativeEvent as InputEvent).inputType;
-            if (inputType !== "insertParagraph" && inputType !== "insertLineBreak") {
-              return;
-            }
-            if (!multiline) {
-              event.preventDefault();
-              return;
-            }
-            event.preventDefault();
-            applyTextEdit("\n");
-          }}
-          onInput={() => syncFromDom(!isComposing.current)}
-          onKeyDown={handleKeyDown}
-          onKeyUp={() => {
-            if (!isComposing.current && editorRef.current) {
-              updatePicker(value, currentCaretOffset(editorRef.current));
-            }
-          }}
-          onMouseUp={handleSelection}
-          onBlur={() => {
-            requestAnimationFrame(() => {
-              const active = document.activeElement;
-              if (
-                active &&
-                !editorRef.current?.contains(active) &&
-                !pickerRef.current?.contains(active)
-              ) {
-                closePicker();
-              }
-            });
-          }}
-          onPaste={handlePaste}
-          onCompositionStart={() => {
-            isComposing.current = true;
-            closePicker();
-          }}
-          onCompositionEnd={handleCompositionEnd}
-        >
-          {editorParts(value, contacts)}
-        </div>
+        {showPreview ? (
+          <div
+            className="mention-editor-preview"
+            data-multiline={multiline}
+            data-max-length={maxLength}
+          >
+            <button
+              className="mention-editor-preview-edit-target"
+              type="button"
+              aria-label={`Edit ${label}`}
+              onClick={beginEditing}
+            />
+            <span className="mention-editor-preview-content">
+              <MentionText
+                text={value.text}
+                field="title"
+                mentions={previewMentions}
+                contacts={contacts}
+              />
+            </span>
+          </div>
+        ) : multiline ? (
+          <textarea
+            ref={(editor) => {
+              editorRef.current = editor;
+            }}
+            className="mention-editor-input"
+            role="combobox"
+            value={value.text}
+            maxLength={maxLength}
+            dir="auto"
+            aria-label={label}
+            aria-autocomplete="list"
+            aria-expanded={query !== null}
+            aria-haspopup="listbox"
+            aria-controls={query ? listboxId : undefined}
+            aria-activedescendant={activeDescendant}
+            data-multiline={multiline}
+            data-max-length={maxLength}
+            onFocus={() => setIsEditing(true)}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleSelection}
+            onSelect={handleSelection}
+            onMouseUp={handleSelection}
+            onBlur={handleBlur}
+            onPaste={handlePaste}
+            onCompositionStart={() => {
+              isComposing.current = true;
+              closePicker();
+            }}
+            onCompositionEnd={handleCompositionEnd}
+          />
+        ) : (
+          <input
+            ref={(editor) => {
+              editorRef.current = editor;
+            }}
+            className="mention-editor-input"
+            type="text"
+            role="combobox"
+            required
+            value={value.text}
+            maxLength={maxLength}
+            dir="auto"
+            aria-label={label}
+            aria-autocomplete="list"
+            aria-expanded={query !== null}
+            aria-haspopup="listbox"
+            aria-controls={query ? listboxId : undefined}
+            aria-activedescendant={activeDescendant}
+            data-multiline={multiline}
+            data-max-length={maxLength}
+            onFocus={() => setIsEditing(true)}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onKeyUp={handleSelection}
+            onSelect={handleSelection}
+            onMouseUp={handleSelection}
+            onBlur={handleBlur}
+            onPaste={handlePaste}
+            onCompositionStart={() => {
+              isComposing.current = true;
+              closePicker();
+            }}
+            onCompositionEnd={handleCompositionEnd}
+          />
+        )}
         {query ? (
           <div
             ref={pickerRef}

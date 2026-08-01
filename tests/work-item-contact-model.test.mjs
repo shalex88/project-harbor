@@ -68,18 +68,29 @@ test("role prefixes rank before names and remain stable", () => {
   );
 });
 
-test("selection inserts a contact id and returns the next caret", () => {
+test("selection inserts a role label with the contact id and returns the next caret", () => {
   const result = insertContactMention(
     { text: "Call a @lawyer", mentions: [] },
     { startOffset: 7, endOffset: 14, query: "lawyer" },
     contacts[1],
   );
 
-  assert.equal(result.value.text, "Call a @Maya Levi");
+  assert.equal(result.value.text, "Call a @Lawyer");
   assert.deepEqual(result.value.mentions, [
-    { contactId: "maya", startOffset: 7, endOffset: 17 },
+    { contactId: "maya", startOffset: 7, endOffset: 14 },
   ]);
-  assert.equal(result.caretOffset, 17);
+  assert.equal(result.caretOffset, 14);
+
+  const hebrewText = "פגישה עם @עורכת דין";
+  const hebrewQuery = findMentionQuery(hebrewText, hebrewText.length);
+  assert.ok(hebrewQuery);
+  const hebrewResult = insertContactMention(
+    { text: hebrewText, mentions: [] },
+    hebrewQuery,
+    contacts[0],
+  );
+  assert.equal(hebrewResult.value.text, "פגישה עם @עורכת דין");
+  assert.equal((hebrewResult.value.text.match(/@/g) ?? []).length, 1);
 });
 
 test("text edits shift later mentions and unlink an edited mention", () => {
@@ -121,7 +132,7 @@ test("explicit multiline and paste edits preserve plain text offsets", () => {
   });
 });
 
-test("manual removal keeps text and current names rewrite ranges safely", () => {
+test("manual removal keeps text and current roles rewrite ranges safely", () => {
   const removed = removeContactMentions(
     {
       text: "התקשר אל @דנה",
@@ -134,17 +145,26 @@ test("manual removal keeps text and current names rewrite ranges safely", () => 
 
   const normalized = normalizeMentionLabels(
     {
-      text: "Call @Dana",
-      mentions: [{ contactId: "dana", startOffset: 5, endOffset: 10 }],
+      text: "Call @Lawyer",
+      mentions: [{ contactId: "maya", startOffset: 5, endOffset: 12 }],
     },
-    [{ ...contacts[0], name: "Dana Cohen" }],
+    [{ ...contacts[1], roleOrCompany: "Senior Counsel" }],
   );
-  assert.equal(normalized.text, "Call @Dana Cohen");
+  assert.equal(normalized.text, "Call @Senior Counsel");
   assert.deepEqual(normalized.mentions[0], {
-    contactId: "dana",
+    contactId: "maya",
     startOffset: 5,
-    endOffset: 16,
+    endOffset: 20,
   });
+
+  const fallback = normalizeMentionLabels(
+    {
+      text: "Call @contact",
+      mentions: [{ contactId: "maya", startOffset: 5, endOffset: 13 }],
+    },
+    [{ ...contacts[1], roleOrCompany: "" }],
+  );
+  assert.equal(fallback.text, "Call @Maya Levi");
 });
 
 test("serialization trims fields and shifts UTF-16 ranges", () => {

@@ -36,6 +36,12 @@ function stableTextCompare(left: string, right: string): number {
   return 0;
 }
 
+export function mentionContactLabel(
+  contact: Pick<ContactRecord, "name" | "roleOrCompany">,
+): string {
+  return contact.roleOrCompany.trim() || contact.name;
+}
+
 function sortMentions(mentions: MentionRange[]): MentionRange[] {
   return [...mentions].sort(
     (left, right) =>
@@ -118,9 +124,9 @@ export function rankMentionContacts<T extends MentionContact>(
 export function insertContactMention(
   value: MentionEditorValue,
   query: MentionQuery,
-  contact: Pick<ContactRecord, "id" | "name">,
+  contact: Pick<ContactRecord, "id" | "name" | "roleOrCompany">,
 ): { value: MentionEditorValue; caretOffset: number } {
-  const replacement = `@${contact.name}`;
+  const replacement = `@${mentionContactLabel(contact)}`;
   const replacedLength = query.endOffset - query.startOffset;
   const delta = replacement.length - replacedLength;
   const endOffset = query.startOffset + replacement.length;
@@ -249,7 +255,7 @@ export function removeContactMentions(
 
 export function normalizeMentionLabels(
   value: MentionEditorValue,
-  contacts: Pick<ContactRecord, "id" | "name">[],
+  contacts: Pick<ContactRecord, "id" | "name" | "roleOrCompany">[],
 ): MentionEditorValue {
   const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
   const normalizedMentions: MentionRange[] = [];
@@ -270,7 +276,7 @@ export function normalizeMentionLabels(
     }
 
     const leading = value.text.slice(sourceOffset, mention.startOffset);
-    const label = `@${contact.name}`;
+    const label = `@${mentionContactLabel(contact)}`;
     chunks.push(leading, label);
     targetOffset += leading.length;
     normalizedMentions.push({
