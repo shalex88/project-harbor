@@ -31,6 +31,12 @@ import {
 import { canManagePayment, normalizeEmail } from "./authorization";
 import type { IdentityUser } from "./auth";
 import { FILE_RENAME_UPDATE_SQL } from "./file-rename-persistence";
+import {
+  CONTACT_DELETE_SQL,
+  CONTACT_INSERT_SQL,
+  CONTACT_UPDATE_SQL,
+  findAuthorizedContactProject,
+} from "./contact-persistence";
 import { createFileRenameService } from "./file-rename-service";
 import {
   DIRECTED_RELATION_INSERT_SQL,
@@ -391,13 +397,17 @@ async function projectForCollection(collectionId: string): Promise<string> {
   return row.project_id;
 }
 
-async function projectForContact(contactId: string): Promise<string> {
-  const row = await first<{ project_id: string }>(
-    "SELECT project_id FROM project_contacts WHERE id = ?",
+async function authorizedContactProject(
+  userId: string,
+  contactId: string,
+): Promise<string> {
+  const projectId = await findAuthorizedContactProject(
+    getRawD1(),
+    userId,
     contactId,
   );
-  if (!row) throw new DomainError("Contact not found", "not_found");
-  return row.project_id;
+  if (!projectId) throw new DomainError("Contact not found", "not_found");
+  return projectId;
 }
 
 async function authorizedCollectionProject(
@@ -977,9 +987,7 @@ export async function applyWorkspaceMutation(
     case "create_contact": {
       await requireProjectAccess(user.id, mutation.projectId);
       await run(
-        `INSERT INTO project_contacts
-         (id,project_id,name,role_or_company,email,phone,notes)
-         VALUES (?,?,?,?,?,?,?)`,
+        CONTACT_INSERT_SQL,
         crypto.randomUUID(),
         mutation.projectId,
         requireText(mutation.name, "Contact name", 160),
@@ -991,11 +999,9 @@ export async function applyWorkspaceMutation(
       break;
     }
     case "update_contact": {
-      const projectId = await projectForContact(mutation.contactId);
-      await requireProjectAccess(user.id, projectId);
+      await authorizedContactProject(user.id, mutation.contactId);
       await run(
-        `UPDATE project_contacts SET name=?,role_or_company=?,email=?,phone=?,
-         notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?`,
+        CONTACT_UPDATE_SQL,
         requireText(mutation.name, "Contact name", 160),
         optionalText(mutation.roleOrCompany, 160, "Role or company"),
         optionalText(mutation.email, 254, "Email"),
@@ -1006,12 +1012,8 @@ export async function applyWorkspaceMutation(
       break;
     }
     case "delete_contact": {
-      const projectId = await projectForContact(mutation.contactId);
-      await requireProjectAccess(user.id, projectId);
-      await run(
-        "DELETE FROM project_contacts WHERE id = ?",
-        mutation.contactId,
-      );
+      await authorizedContactProject(user.id, mutation.contactId);
+      await run(CONTACT_DELETE_SQL, mutation.contactId);
       break;
     }
     case "create_collection": {

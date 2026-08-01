@@ -68,6 +68,9 @@ test("contact cards collapse from three columns to one without clipping", () => 
   const mobile = styles.slice(styles.indexOf("@media (max-width: 640px)"));
   assert.match(mobile, /\.contact-grid[\s\S]*?grid-template-columns:\s*1fr/);
   assert.match(styles, /\.contact-details a[\s\S]*?overflow-wrap:\s*anywhere/);
+  assert.match(styles, /\.contact-card-heading > div[\s\S]*?min-width:\s*0/);
+  assert.match(styles, /\.contact-card-heading h3[\s\S]*?overflow-wrap:\s*anywhere/);
+  assert.match(styles, /\.contact-actions \.button[\s\S]*?min-height:\s*44px/);
 });
 
 test("contacts has a first-class route and aggregate workspace", () => {
