@@ -24,6 +24,7 @@ import { TaskStatusChip } from "./task-status-chip";
 import { TimelinePeriodControls } from "./timeline-period-label";
 import { EmptyState, MetricCard } from "./ui";
 import { WorkItemTitle } from "./work-item-title";
+import { WorkItemOpenSurface } from "./work-item-open-surface";
 import type { AppRoute } from "./app-shell";
 
 type DashboardProps = {
@@ -196,9 +197,13 @@ function TaskRow({
   onOpen: () => void;
 }) {
   return (
-    <button className="task-row" type="button" onClick={onOpen}>
+    <WorkItemOpenSurface
+      className="task-row"
+      label={`Open task ${item.title}`}
+      onOpen={onOpen}
+    >
       <span className="row-title">
-        <WorkItemTitle item={item} />
+        <WorkItemTitle item={item} contacts={snapshot.contacts} />
         <small>
           {workItemMetadata(
             [
@@ -214,7 +219,7 @@ function TaskRow({
       <span className="date-chip">{item.dueDate ? prettyDate(item.dueDate) : "No due date"}</span>
       <TaskStatusChip status={item.status} />
       <span className="row-arrow" aria-hidden="true">›</span>
-    </button>
+    </WorkItemOpenSurface>
   );
 }
 
@@ -228,13 +233,17 @@ function EventRow({
   onOpen: () => void;
 }) {
   return (
-    <button className="event-row" type="button" onClick={onOpen}>
+    <WorkItemOpenSurface
+      className="event-row"
+      label={`Open event ${item.title}`}
+      onOpen={onOpen}
+    >
       <span className="event-date" aria-hidden="true">
         <strong>{new Date(`${item.occurrenceDate}T00:00:00Z`).getUTCDate()}</strong>
         <small>{new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" }).format(new Date(`${item.occurrenceDate}T00:00:00Z`))}</small>
       </span>
       <span className="row-title">
-        <WorkItemTitle item={item} />
+        <WorkItemTitle item={item} contacts={snapshot.contacts} />
         <small>
           {workItemMetadata(
             [
@@ -248,7 +257,7 @@ function EventRow({
         </small>
       </span>
       <span className="row-arrow" aria-hidden="true">›</span>
-    </button>
+    </WorkItemOpenSurface>
   );
 }
 
@@ -611,14 +620,19 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                 <header><strong>{prettyDate(date)}</strong><span>{items.length} item{items.length === 1 ? "" : "s"}</span></header>
                 <div>
                   {items.map((item) => (
-                    <button className={`agenda-item agenda-${item.type}`} type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
+                    <WorkItemOpenSurface
+                      className={`agenda-item agenda-${item.type}`}
+                      label={`Open ${item.type} ${item.title}`}
+                      key={item.id}
+                      onOpen={() => onOpenItem(item.id)}
+                    >
                       {item.type === "task" ? (
                         <TaskStatusChip status={item.status} />
                       ) : (
                         <span className="agenda-event-label">Event</span>
                       )}
                       <span className="agenda-item-content" dir="auto">
-                        <WorkItemTitle item={item} />
+                        <WorkItemTitle item={item} contacts={snapshot.contacts} />
                         <small>
                           {workItemMetadata(
                             [
@@ -631,7 +645,7 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                           )}
                         </small>
                       </span>
-                    </button>
+                    </WorkItemOpenSurface>
                   ))}
                 </div>
               </section>
@@ -652,22 +666,22 @@ export function TimelineDashboard({ snapshot, onOpenItem }: DashboardProps) {
                     snapshot.items,
                   );
                   return (
-                    <button
-                      type="button"
+                    <WorkItemOpenSurface
                       key={item.id}
                       className={`calendar-item calendar-${item.type}`}
-                      onClick={() => onOpenItem(item.id)}
+                      label={`Open ${item.type} ${item.title}`}
+                      onOpen={() => onOpenItem(item.id)}
                     >
                       {item.type === "task" ? (
                         <TaskStatusChip status={item.status} compact />
                       ) : (
                         <span aria-hidden="true">◷</span>
                       )}
-                      <WorkItemTitle item={item} />
+                      <WorkItemTitle item={item} contacts={snapshot.contacts} />
                       {relationPhrases.length ? (
                         <small>{relationPhrases.join(" · ")}</small>
                       ) : null}
-                    </button>
+                    </WorkItemOpenSurface>
                   );
                 })}
               </div>
@@ -810,9 +824,14 @@ export function SpendingDashboard({ snapshot, onOpenItem }: DashboardProps) {
         <Panel title="Over estimate" count={overEstimate.length}>
           <div className="row-list compact-list">
             {overEstimate.map((item) => (
-              <button className="money-row" type="button" key={item.id} onClick={() => onOpenItem(item.id)}>
+              <WorkItemOpenSurface
+                className="money-row"
+                label={`Open ${item.type} ${item.title}`}
+                key={item.id}
+                onOpen={() => onOpenItem(item.id)}
+              >
                 <span className="row-title">
-                  <WorkItemTitle item={item} />
+                  <WorkItemTitle item={item} contacts={snapshot.contacts} />
                   <small>
                     {workItemMetadata(
                       [projectName(snapshot, item.projectId)],
@@ -826,7 +845,7 @@ export function SpendingDashboard({ snapshot, onOpenItem }: DashboardProps) {
                   <TaskStatusChip status={item.status} />
                 ) : null}
                 <span className="money-over">+{formatMoney(item.varianceMinor ?? 0, projectCurrency(snapshot, item.projectId))}</span>
-              </button>
+              </WorkItemOpenSurface>
             ))}
             {!overEstimate.length ? <EmptyState title="Everything is on estimate" description="Items above their estimate will be called out here." /> : null}
           </div>

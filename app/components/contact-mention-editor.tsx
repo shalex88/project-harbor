@@ -337,7 +337,7 @@ export function ContactMentionEditor({
   };
 
   return (
-    <label className="field mention-editor-field">
+    <div className="field mention-editor-field">
       <span className="field-label">{label}</span>
       <div
         className="mention-editor"
@@ -418,6 +418,6 @@ export function ContactMentionEditor({
       <span className="field-hint">
         Type @ to mention a project contact · {value.text.length}/{maxLength}
       </span>
-    </label>
+    </div>
   );
 }
