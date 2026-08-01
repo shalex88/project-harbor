@@ -2683,10 +2683,6 @@ strong.work-item-title {
     grid-template-columns: 1fr;
   }
 
-  .contact-project-filter {
-    width: 100%;
-  }
-
   .collection-tab-wrap {
     align-items: stretch;
     flex-direction: column;
