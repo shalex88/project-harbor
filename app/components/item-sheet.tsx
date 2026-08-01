@@ -27,11 +27,17 @@ import {
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
 import { ContactMentionEditor } from "./contact-mention-editor";
+import { FollowUpMenu } from "./follow-up-menu";
 import { WorkItemContactSelector } from "./work-item-contact-selector";
 
 export type ItemSheetMode =
   | { kind: "new"; type: "task" | "event"; collectionId: string }
-  | { kind: "follow-up"; sourceEventId: string; collectionId: string }
+  | {
+      kind: "follow-up";
+      sourceItemId: string;
+      type: "task" | "event";
+      collectionId: string;
+    }
   | { kind: "existing"; itemId: string }
   | null;
 
@@ -74,7 +80,11 @@ export function ItemSheet({
   onClose: () => void;
   onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
   onOpenItem: (itemId: string) => void;
-  onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
+  onStartFollowUp: (
+    sourceItemId: string,
+    collectionId: string,
+    type: "task" | "event",
+  ) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
@@ -83,7 +93,7 @@ export function ItemSheet({
     mode?.kind === "existing"
       ? mode.itemId
       : mode?.kind === "follow-up"
-        ? `follow-up-${mode.sourceEventId}-${mode.collectionId}`
+        ? `follow-up-${mode.sourceItemId}-${mode.type}-${mode.collectionId}`
         : mode
           ? `new-${mode.type}-${mode.collectionId}`
           : "closed";
@@ -91,7 +101,7 @@ export function ItemSheet({
     mode?.kind === "existing"
       ? "Item details"
       : mode?.kind === "follow-up"
-        ? "New follow-up task"
+        ? `New follow-up ${mode.type}`
         : mode?.type === "event"
           ? "New event"
           : "New task";
@@ -137,23 +147,29 @@ function ItemSheetContent({
   onClose: () => void;
   onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
   onOpenItem: (itemId: string) => void;
-  onStartFollowUp: (sourceEventId: string, collectionId: string) => void;
+  onStartFollowUp: (
+    sourceItemId: string,
+    collectionId: string,
+    type: "task" | "event",
+  ) => void;
   onUpload: (target: FileTarget, file: File) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
   const item = mode.kind === "existing" ? snapshot.items.find((candidate) => candidate.id === mode.itemId) ?? null : null;
-  const sourceEvent =
+  const sourceItem =
     mode.kind === "follow-up"
-      ? snapshot.items.find(
-          (candidate) =>
-            candidate.id === mode.sourceEventId && candidate.type === "event",
-        ) ?? null
+      ? snapshot.items.find((candidate) => candidate.id === mode.sourceItemId) ??
+        null
       : null;
-  const type = item?.type ?? (mode.kind === "new" ? mode.type : "task");
+  const type =
+    item?.type ??
+    (mode.kind === "new" || mode.kind === "follow-up"
+      ? mode.type
+      : "task");
   const collectionId = item?.collectionId ?? (mode.kind === "new" || mode.kind === "follow-up" ? mode.collectionId : "");
   const collection = snapshot.collections.find((candidate) => candidate.id === collectionId);
-  const project = snapshot.projects.find((candidate) => candidate.id === (item?.projectId ?? sourceEvent?.projectId ?? collection?.projectId));
+  const project = snapshot.projects.find((candidate) => candidate.id === (item?.projectId ?? sourceItem?.projectId ?? collection?.projectId));
   const projectContacts = snapshot.contacts.filter(
     (contact) => contact.projectId === project?.id,
   );
@@ -192,8 +208,8 @@ function ItemSheetContent({
   if (mode.kind === "existing" && !item) {
     return <EmptyState title="Item unavailable" description="It may have been removed or moved while this panel was open." />;
   }
-  if (mode.kind === "follow-up" && !sourceEvent) {
-    return <EmptyState title="Source event unavailable" description="It may have been removed while this panel was open." />;
+  if (mode.kind === "follow-up" && !sourceItem) {
+    return <EmptyState title="Source item unavailable" description="It may have been removed while this panel was open." />;
   }
 
   const handleItemSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -224,11 +240,12 @@ function ItemSheetContent({
           estimatedCostMinor: estimate,
           ...contactFields,
         };
-        if (mode.kind === "follow-up" && sourceEvent) {
+        if (mode.kind === "follow-up" && sourceItem) {
           await onMutate({
-            action: "create_follow_up_task",
-            sourceEventId: sourceEvent.id,
+            action: "create_follow_up_item",
+            sourceItemId: sourceItem.id,
             collectionId: String(data.get("collectionId") ?? collectionId),
+            type: common.type,
             title: common.title,
             description: common.description,
             status: common.status,
@@ -252,11 +269,25 @@ function ItemSheetContent({
           estimatedCostMinor: estimate,
           ...contactFields,
         };
-        await onMutate(
-          item
-            ? { action: "update_item", itemId: item.id, ...common }
-            : { action: "create_item", collectionId, ...common },
-        );
+        if (mode.kind === "follow-up" && sourceItem) {
+          await onMutate({
+            action: "create_follow_up_item",
+            sourceItemId: sourceItem.id,
+            collectionId: String(data.get("collectionId") ?? collectionId),
+            type: common.type,
+            title: common.title,
+            description: common.description,
+            occurrenceDate: common.occurrenceDate,
+            estimatedCostMinor: common.estimatedCostMinor,
+            ...contactFields,
+          });
+        } else {
+          await onMutate(
+            item
+              ? { action: "update_item", itemId: item.id, ...common }
+              : { action: "create_item", collectionId, ...common },
+          );
+        }
       }
       if (!item && mode.kind === "new") onClose();
     } catch (error) {
@@ -341,10 +372,10 @@ function ItemSheetContent({
         <span>{collection?.name ?? "Collection"}</span>
       </div>
 
-      {sourceEvent ? (
+      {sourceItem ? (
         <div className="follow-up-source">
           <span>Follows from</span>
-          <strong>{sourceEvent.title}</strong>
+          <strong>{sourceItem.title}</strong>
         </div>
       ) : null}
 
@@ -437,15 +468,16 @@ function ItemSheetContent({
             {item ? (
               <div className="item-secondary-actions">
                 <button className="button button-danger" type="button" onClick={() => setConfirmDelete(true)}>Delete {type}</button>
-                {item.type === "event" ? (
-                  <button
-                    className="button button-secondary"
-                    type="button"
-                    onClick={() => onStartFollowUp(item.id, item.collectionId)}
-                  >
-                    Create follow-up task
-                  </button>
-                ) : null}
+                <FollowUpMenu
+                  disabled={pending}
+                  onSelect={(followUpType) =>
+                    onStartFollowUp(
+                      item.id,
+                      item.collectionId,
+                      followUpType,
+                    )
+                  }
+                />
               </div>
             ) : <span />}
             <div><button className="button button-secondary" type="button" onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending}>{pending ? "Saving…" : item ? "Save changes" : `Create ${type}`}</button></div>

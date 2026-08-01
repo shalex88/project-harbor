@@ -230,7 +230,7 @@ export function HarborApp({
       );
       acceptSnapshot(result.snapshot);
       if (
-        mutation.action === "create_follow_up_task" &&
+        mutation.action === "create_follow_up_item" &&
         result.createdItemId
       ) {
         setItemMode({ kind: "existing", itemId: result.createdItemId });
@@ -715,8 +715,13 @@ export function HarborApp({
         onClose={() => setItemMode(null)}
         onMutate={mutate}
         onOpenItem={(itemId) => setItemMode({ kind: "existing", itemId })}
-        onStartFollowUp={(sourceEventId, collectionId) =>
-          setItemMode({ kind: "follow-up", sourceEventId, collectionId })
+        onStartFollowUp={(sourceItemId, collectionId, type) =>
+          setItemMode({
+            kind: "follow-up",
+            sourceItemId,
+            collectionId,
+            type,
+          })
         }
         onUpload={upload}
         onRenameFile={renameFile}
@@ -1079,8 +1084,10 @@ function successMessage(mutation: WorkspaceMutation): string {
       return mutation.type === "task" ? "Task updated" : "Event updated";
     case "delete_item":
       return "Item deleted";
-    case "create_follow_up_task":
-      return "Follow-up task created";
+    case "create_follow_up_item":
+      return mutation.type === "task"
+        ? "Follow-up task created"
+        : "Follow-up event created";
     case "create_relation":
       return "Relationship added";
     case "delete_relation":

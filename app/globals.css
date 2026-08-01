@@ -2155,6 +2155,43 @@ strong.work-item-title {
   flex-wrap: wrap;
 }
 
+.follow-up-menu {
+  position: relative;
+}
+
+.follow-up-menu-popover {
+  position: absolute;
+  z-index: 40;
+  inset-inline-start: 0;
+  bottom: calc(100% + 7px);
+  display: grid;
+  width: min(180px, calc(100vw - 48px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--card);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.35);
+  padding: 5px;
+}
+
+.follow-up-menu-popover button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 9px 12px;
+  text-align: start;
+  cursor: pointer;
+}
+
+.follow-up-menu-popover button:hover,
+.follow-up-menu-popover button:focus-visible {
+  outline: 0;
+  background: rgba(34, 211, 238, 0.1);
+  color: var(--cyan);
+}
+
 .relations-panel,
 .relation-groups {
   display: grid;
