@@ -111,7 +111,7 @@ export function ContactsWorkspace({
   const filtered = selectedProjectId !== ALL_CONTACT_PROJECTS;
 
   return (
-    <section className="contacts-workspace" aria-label="All project contacts">
+    <section className="contacts-workspace" aria-label="Contacts">
       <div className="contact-filter-bar" aria-label="Contact filters">
         <label className="contact-project-filter">
           <span>Project</span>
