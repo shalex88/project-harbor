@@ -23,7 +23,7 @@ test("repository enforces relationship graph and project invariants", () => {
   for (const sourceMarker of [
     'case "create_relation"',
     'case "delete_relation"',
-    'case "create_follow_up_task"',
+    'case "create_follow_up_item"',
     "Relationship would create a cycle",
     "Blocking relationships require two tasks",
     "Items must belong to the same project",
@@ -46,34 +46,46 @@ test("relation endpoints are authorized before project details are compared", ()
   );
 });
 
-test("follow-up responses identify the task created by the mutation", () => {
-  assert.match(repository, /createdItemId = taskId/);
+test("follow-up responses identify the item created by the mutation", () => {
+  assert.match(repository, /createdItemId = itemId/);
   assert.match(repository, /return \{ snapshot: await loadWorkspaceSnapshot\(identity\), createdItemId \}/);
 });
 
-test("follow-up collections are authorized before project comparison", () => {
+test("follow-up creation authorizes generic source and collection before comparing projects", () => {
   const followUpCase = repository.slice(
-    repository.indexOf('case "create_follow_up_task"'),
+    repository.indexOf('case "create_follow_up_item"'),
     repository.indexOf('case "create_relation"'),
+  );
+  assert.match(
+    followUpCase,
+    /authorizedRelationItem\(\s*user\.id,\s*mutation\.sourceItemId/,
   );
   assert.match(
     followUpCase,
     /authorizedCollectionProject\(\s*user\.id,\s*mutation\.collectionId/,
   );
+  assert.doesNotMatch(followUpCase, /source\.type\s*!==\s*"event"/);
   assert.ok(
     followUpCase.indexOf("authorizedCollectionProject") <
       followUpCase.indexOf(
-        "Follow-up task collection must belong to the event project",
+        "Follow-up item collection must belong to the source project",
       ),
   );
 });
 
-test("follow-up creation batches the task and follows-from relation", () => {
-  assert.match(repository, /mutation\.sourceEventId/);
-  assert.match(repository, /source\.type !== "event"/);
-  assert.match(repository, /mutation\.collectionId/);
-  assert.match(repository, /db\.batch\(\[/);
-  assert.match(repository, /'follows_from'/);
+test("follow-up creation inserts either item type and batches the relation", () => {
+  const followUpCase = repository.slice(
+    repository.indexOf('case "create_follow_up_item"'),
+    repository.indexOf('case "create_relation"'),
+  );
+  assert.match(followUpCase, /mutation\.type === "task"/);
+  assert.match(followUpCase, /'task'/);
+  assert.match(followUpCase, /'event'/);
+  assert.match(followUpCase, /source\.id,\s*itemId/);
+  assert.match(followUpCase, /'follows_from'/);
+  assert.match(followUpCase, /appendContactStateStatements\(statements/);
+  assert.match(followUpCase, /await db\.batch\(statements\)/);
+  assert.match(followUpCase, /createdItemId = itemId/);
 });
 
 test("workspace snapshots load authorized relationship records", () => {

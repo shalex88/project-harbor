@@ -17,7 +17,7 @@ function mutationCase(action, nextAction) {
 test("item mutations validate contact state before one atomic batch", () => {
   const createItem = mutationCase("create_item", "update_item");
   const updateItem = mutationCase("update_item", "delete_item");
-  const followUp = mutationCase("create_follow_up_task", "create_relation");
+  const followUp = mutationCase("create_follow_up_item", "create_relation");
 
   for (const source of [createItem, updateItem, followUp]) {
     assert.match(source, /validateWorkItemContactState\(/);

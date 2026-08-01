@@ -1398,25 +1398,26 @@ export async function applyWorkspaceMutation(
       ]);
       break;
     }
-    case "create_follow_up_task": {
+    case "create_follow_up_item": {
       const source = await authorizedRelationItem(
         user.id,
-        mutation.sourceEventId,
+        mutation.sourceItemId,
       );
-      if (source.type !== "event") {
-        throw new DomainError("Follow-up tasks require a source event");
-      }
       const collectionProjectId = await authorizedCollectionProject(
         user.id,
         mutation.collectionId,
       );
       if (collectionProjectId !== source.projectId) {
         throw new DomainError(
-          "Follow-up task collection must belong to the event project",
+          "Follow-up item collection must belong to the source project",
         );
       }
-      const taskId = crypto.randomUUID();
-      const title = requireText(mutation.title, "Task title", 160);
+      const itemId = crypto.randomUUID();
+      const title = requireText(
+        mutation.title,
+        mutation.type === "task" ? "Task title" : "Event title",
+        160,
+      );
       const description = optionalText(mutation.description);
       const estimate =
         mutation.estimatedCostMinor === null ||
@@ -1432,23 +1433,46 @@ export async function applyWorkspaceMutation(
         contacts: await projectContactIdentities(source.projectId),
       });
       const db = getRawD1();
-      const statements: D1PreparedStatement[] = [
-        db
-          .prepare(
-            `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
-             VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
-          )
-          .bind(
-            taskId,
-            source.projectId,
-            mutation.collectionId,
-            title,
-            description,
-            validateTaskStatus(mutation.status),
-            validateOptionalIsoDate(mutation.dueDate, "Due date"),
-            estimate,
-            user.id,
-          ),
+      const statements: D1PreparedStatement[] = [];
+      if (mutation.type === "task") {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
+               VALUES (?,?,?,'task',?,?,?,?,NULL,?,?)`,
+            )
+            .bind(
+              itemId,
+              source.projectId,
+              mutation.collectionId,
+              title,
+              description,
+              validateTaskStatus(mutation.status),
+              validateOptionalIsoDate(mutation.dueDate, "Due date"),
+              estimate,
+              user.id,
+            ),
+        );
+      } else {
+        statements.push(
+          db
+            .prepare(
+              `INSERT INTO work_items (id,project_id,collection_id,type,title,description,status,due_date,occurrence_date,estimated_cost_minor,created_by)
+               VALUES (?,?,?,'event',?,?,NULL,NULL,?,?,?)`,
+            )
+            .bind(
+              itemId,
+              source.projectId,
+              mutation.collectionId,
+              title,
+              description,
+              validateIsoDate(mutation.occurrenceDate, "Occurrence date"),
+              estimate,
+              user.id,
+            ),
+        );
+      }
+      statements.push(
         db
           .prepare(
             `INSERT INTO work_item_relations (id,project_id,source_item_id,target_item_id,type,created_by)
@@ -1458,18 +1482,18 @@ export async function applyWorkspaceMutation(
             crypto.randomUUID(),
             source.projectId,
             source.id,
-            taskId,
+            itemId,
             user.id,
           ),
-      ];
+      );
       appendContactStateStatements(statements, db, {
-        itemId: taskId,
+        itemId,
         projectId: source.projectId,
         state,
         replace: false,
       });
       await db.batch(statements);
-      createdItemId = taskId;
+      createdItemId = itemId;
       break;
     }
     case "create_relation": {
