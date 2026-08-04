@@ -1,16 +1,23 @@
-import type { ContactRecord, WorkItemRecord } from "@/lib/domain";
+import {
+  hasAttachedFiles,
+  type ContactRecord,
+  type WorkItemRecord,
+} from "@/lib/domain";
 import { MentionText } from "./mention-text";
 
 export function WorkItemTitle({
   item,
   contacts = [],
 }: {
-  item: Pick<WorkItemRecord, "title" | "files" | "contactMentions">;
+  item: Pick<
+    WorkItemRecord,
+    "title" | "files" | "payments" | "contactMentions"
+  >;
   contacts?: ContactRecord[];
 }) {
   return (
     <strong className="work-item-title">
-      {item.files.length > 0 ? (
+      {hasAttachedFiles(item) ? (
         <span
           className="attachment-indicator"
           role="img"

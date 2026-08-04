@@ -158,6 +158,15 @@ export type EventRecord = WorkItemBase & {
 
 export type WorkItemRecord = TaskRecord | EventRecord;
 
+export function hasAttachedFiles(
+  item: Pick<WorkItemRecord, "files" | "payments">,
+): boolean {
+  return (
+    item.files.length > 0 ||
+    item.payments.some((payment) => payment.receiptFileId !== null)
+  );
+}
+
 export type WorkItemRelationRecord = {
   id: string;
   projectId: string;

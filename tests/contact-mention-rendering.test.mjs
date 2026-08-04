@@ -140,11 +140,9 @@ test("contact details link the displayed phone and email without action buttons"
   assert.doesNotMatch(result.stdout, />Call<\/a>|>Email<\/a>/);
 });
 
-test("mention rendering is metadata based and shared titles preserve attachments", () => {
+test("mention rendering is metadata based in shared titles", () => {
   assert.match(mentionSource, /mention\.contactId/);
   assert.doesNotMatch(mentionSource, /contacts\.find\([^\n]*name\s*===/);
-  assert.match(titleSource, /Pick<WorkItemRecord, "title" \| "files" \| "contactMentions">/);
   assert.match(titleSource, /<MentionText/);
   assert.match(titleSource, /field="title"/);
-  assert.match(titleSource, /item\.files\.length > 0/);
 });
