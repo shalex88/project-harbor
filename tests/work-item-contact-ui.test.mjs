@@ -81,7 +81,7 @@ test("overlay item rows render a separate mention button without nesting", () =>
     import { WorkItemOpenSurface } from "./app/components/work-item-open-surface.tsx";
     import { WorkItemTitle } from "./app/components/work-item-title.tsx";
     const contact = { id: "dana", projectId: "p1", name: "דנה כהן", roleOrCompany: "עורכת דין", email: "dana@example.com", phone: "+97250", notes: "", createdAt: "", updatedAt: "" };
-    const item = { title: "Call @דנה כהן", files: [], contactMentions: [{ id: "m1", itemId: "t1", contactId: "dana", field: "title", startOffset: 5, endOffset: 13 }] };
+    const item = { title: "Call @דנה כהן", files: [], payments: [], contactMentions: [{ id: "m1", itemId: "t1", contactId: "dana", field: "title", startOffset: 5, endOffset: 13 }] };
     const html = renderToStaticMarkup(React.createElement(WorkItemOpenSurface, { className: "task-row", label: "Open task", onOpen() {} }, React.createElement(WorkItemTitle, { item, contacts: [contact] })));
     process.stdout.write(html);
   `;

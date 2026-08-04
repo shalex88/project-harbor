@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import * as domain from "../lib/domain.ts";
 import {
   formatMoney,
   moneyInputValue,
@@ -16,6 +17,25 @@ import {
   validateTaskStatus,
   validateRelationType,
 } from "../lib/domain.ts";
+
+test("attached files include ordinary attachments and payment receipts", () => {
+  assert.equal(typeof domain.hasAttachedFiles, "function");
+  assert.equal(domain.hasAttachedFiles({ files: [{}], payments: [] }), true);
+  assert.equal(
+    domain.hasAttachedFiles({
+      files: [],
+      payments: [{ receiptFileId: "receipt-1" }],
+    }),
+    true,
+  );
+  assert.equal(
+    domain.hasAttachedFiles({
+      files: [],
+      payments: [{ receiptFileId: null }],
+    }),
+    false,
+  );
+});
 
 test("task status accepts only todo and done", () => {
   assert.equal(validateTaskStatus("todo"), "todo");

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
@@ -16,8 +17,7 @@ const projectSource = await readFile(
   "utf8",
 ).catch(() => "");
 
-test("work item titles show an accessible paperclip only for attached files", () => {
-  assert.match(titleSource, /item\.files\.length\s*>\s*0/);
+test("work item titles render an accessible paperclip", () => {
   assert.match(titleSource, /Has attached files/);
   assert.match(
     titleSource,
@@ -26,6 +26,44 @@ test("work item titles show an accessible paperclip only for attached files", ()
   assert.doesNotMatch(titleSource, /className="sr-only">Has attached files/);
   assert.match(titleSource, /📎/);
   assert.doesNotMatch(titleSource, /files\.length\s*\}/);
+});
+
+test("rendered titles show a paperclip for attachments and receipts only", () => {
+  const script = String.raw`
+    import React from "react";
+    import { renderToStaticMarkup } from "react-dom/server";
+    import { WorkItemTitle } from "./app/components/work-item-title.tsx";
+
+    const renderTitle = (files, payments) =>
+      renderToStaticMarkup(
+        React.createElement(WorkItemTitle, {
+          item: {
+            title: "Task",
+            files,
+            payments,
+            contactMentions: [],
+          },
+        }),
+      );
+
+    process.stdout.write(JSON.stringify([
+      renderTitle([{}], []),
+      renderTitle([], [{ receiptFileId: "receipt-1" }]),
+      renderTitle([], [{ receiptFileId: null }]),
+    ]));
+  `;
+  const result = spawnSync(
+    process.execPath,
+    ["--import", "tsx", "--input-type=module", "-e", script],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+
+  const [ordinaryAttachment, paymentReceipt, paymentWithoutReceipt] =
+    JSON.parse(result.stdout);
+  assert.match(ordinaryAttachment, /class="attachment-indicator"/);
+  assert.match(paymentReceipt, /class="attachment-indicator"/);
+  assert.doesNotMatch(paymentWithoutReceipt, /class="attachment-indicator"/);
 });
 
 test("every global dashboard work-item title uses the shared indicator", () => {
