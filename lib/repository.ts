@@ -1020,6 +1020,7 @@ export async function applyWorkspaceMutation(
   await ensurePreviewSchema();
   const user = await syncUser(identity);
   let createdItemId: string | null = null;
+  let createdPaymentId: string | null = null;
 
   switch (mutation.action) {
     case "create_project": {
@@ -1547,15 +1548,17 @@ export async function applyWorkspaceMutation(
     case "create_payment": {
       const projectId = await projectForItem(mutation.itemId);
       await requireProjectAccess(user.id, projectId);
+      const paymentId = crypto.randomUUID();
       await run(
         "INSERT INTO payments (id,item_id,amount_minor,paid_on,note,created_by) VALUES (?,?,?,?,?,?)",
-        crypto.randomUUID(),
+        paymentId,
         mutation.itemId,
         validateMinorAmount(mutation.amountMinor, { positive: true }),
         validateIsoDate(mutation.paidOn, "Payment date"),
         optionalText(mutation.note, 500),
         user.id,
       );
+      createdPaymentId = paymentId;
       break;
     }
     case "update_payment": {
@@ -1594,7 +1597,11 @@ export async function applyWorkspaceMutation(
     }
   }
 
-  return { snapshot: await loadWorkspaceSnapshot(identity), createdItemId };
+  return {
+    snapshot: await loadWorkspaceSnapshot(identity),
+    createdItemId,
+    createdPaymentId,
+  };
 }
 
 export async function getUserByIdentity(identity: IdentityUser): Promise<AppUser> {

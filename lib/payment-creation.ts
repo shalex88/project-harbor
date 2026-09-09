@@ -1,4 +1,8 @@
-import type { WorkspaceMutation, WorkspaceSnapshot } from "./domain";
+import type {
+  WorkspaceMutation,
+  WorkspaceMutationResult,
+  WorkspaceSnapshot,
+} from "./domain";
 
 type CreatePaymentMutation = Extract<
   WorkspaceMutation,
@@ -7,35 +11,28 @@ type CreatePaymentMutation = Extract<
 
 export async function createPaymentWithOptionalReceipt({
   mutation,
-  existingPaymentIds,
   receipt,
   mutate,
   upload,
   onPaymentCreated,
 }: {
   mutation: CreatePaymentMutation;
-  existingPaymentIds: readonly string[];
   receipt: File | null;
-  mutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  mutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   upload: (target: { paymentId: string }, file: File) => Promise<void>;
   onPaymentCreated?: (snapshot: WorkspaceSnapshot) => void;
-}): Promise<WorkspaceSnapshot> {
-  const snapshot = await mutate(mutation);
-  onPaymentCreated?.(snapshot);
+}): Promise<WorkspaceMutationResult> {
+  const result = await mutate(mutation);
+  onPaymentCreated?.(result.snapshot);
 
-  if (!receipt) return snapshot;
+  if (!receipt) return result;
 
-  const previousIds = new Set(existingPaymentIds);
-  const createdPayment = snapshot.items
-    .find((candidate) => candidate.id === mutation.itemId)
-    ?.payments.find((payment) => !previousIds.has(payment.id));
-
-  if (!createdPayment) {
+  if (!result.createdPaymentId) {
     throw new Error(
       "Payment saved, but the receipt could not be attached. Upload it from payment history.",
     );
   }
 
-  await upload({ paymentId: createdPayment.id }, receipt);
-  return snapshot;
+  await upload({ paymentId: result.createdPaymentId }, receipt);
+  return result;
 }

@@ -192,6 +192,7 @@ export type WorkspaceSnapshot = {
 export type WorkspaceMutationResult = {
   snapshot: WorkspaceSnapshot;
   createdItemId: string | null;
+  createdPaymentId: string | null;
 };
 
 type ContactMutationFields = {

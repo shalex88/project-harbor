@@ -9,6 +9,7 @@ import {
   type PaymentRecord,
   type WorkItemRecord,
   type WorkspaceMutation,
+  type WorkspaceMutationResult,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import {
@@ -79,7 +80,7 @@ export function ItemSheet({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (
     sourceItemId: string,
@@ -146,7 +147,7 @@ function ItemSheetContent({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (
     sourceItemId: string,
@@ -349,7 +350,6 @@ function ItemSheetContent({
             itemId: item.id,
             ...common,
           },
-          existingPaymentIds: item.payments.map((payment) => payment.id),
           receipt,
           mutate: onMutate,
           upload: onUpload,

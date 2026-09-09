@@ -25,18 +25,25 @@ test("a new payment uploads its selected receipt against the created payment", a
     items: [
       {
         id: "item-1",
-        payments: [{ id: "payment-old" }, { id: "payment-new" }],
+        payments: [
+          { id: "payment-concurrent" },
+          { id: "payment-old" },
+          { id: "payment-new" },
+        ],
       },
     ],
   };
 
   const result = await paymentCreationModule.createPaymentWithOptionalReceipt({
     mutation,
-    existingPaymentIds: ["payment-old"],
     receipt,
     mutate: async (receivedMutation) => {
       events.push(["mutate", receivedMutation]);
-      return snapshot;
+      return {
+        snapshot,
+        createdItemId: null,
+        createdPaymentId: "payment-new",
+      };
     },
     onPaymentCreated: (createdSnapshot) => {
       events.push(["created", createdSnapshot]);
@@ -46,7 +53,7 @@ test("a new payment uploads its selected receipt against the created payment", a
     },
   });
 
-  assert.equal(result, snapshot);
+  assert.equal(result.snapshot, snapshot);
   assert.deepEqual(events, [
     ["mutate", mutation],
     ["created", snapshot],
@@ -73,14 +80,57 @@ test("a new payment without a receipt only creates the payment", async () => {
       paidOn: "2026-09-09",
       note: "",
     },
-    existingPaymentIds: [],
     receipt: null,
-    mutate: async () => snapshot,
+    mutate: async () => ({
+      snapshot,
+      createdItemId: null,
+      createdPaymentId: "payment-new",
+    }),
     upload: async () => {
       uploadCount += 1;
     },
   });
 
-  assert.equal(result, snapshot);
+  assert.equal(result.snapshot, snapshot);
   assert.equal(uploadCount, 0);
+});
+
+test("a receipt upload failure preserves the single successful payment creation", async () => {
+  let mutationCount = 0;
+  const events = [];
+  const uploadError = new Error("Receipt upload failed");
+  const snapshot = {
+    items: [{ id: "item-1", payments: [{ id: "payment-new" }] }],
+  };
+
+  await assert.rejects(
+    paymentCreationModule.createPaymentWithOptionalReceipt({
+      mutation: {
+        action: "create_payment",
+        itemId: "item-1",
+        amountMinor: 100,
+        paidOn: "2026-09-09",
+        note: "",
+      },
+      receipt: { name: "receipt.pdf", size: 2048 },
+      mutate: async () => {
+        mutationCount += 1;
+        events.push("mutate");
+        return {
+          snapshot,
+          createdItemId: null,
+          createdPaymentId: "payment-new",
+        };
+      },
+      onPaymentCreated: () => events.push("created"),
+      upload: async () => {
+        events.push("upload");
+        throw uploadError;
+      },
+    }),
+    uploadError,
+  );
+
+  assert.equal(mutationCount, 1);
+  assert.deepEqual(events, ["mutate", "created", "upload"]);
 });
