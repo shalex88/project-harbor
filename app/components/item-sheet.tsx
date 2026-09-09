@@ -87,7 +87,7 @@ export function ItemSheet({
     collectionId: string,
     type: "task" | "event",
   ) => void;
-  onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onUpload: (target: FileTarget, file: File, options?: { notifySuccess?: boolean }) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
@@ -154,7 +154,7 @@ function ItemSheetContent({
     collectionId: string,
     type: "task" | "event",
   ) => void;
-  onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onUpload: (target: FileTarget, file: File, options?: { notifySuccess?: boolean }) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {

@@ -19,7 +19,7 @@ export async function createPaymentWithOptionalReceipt({
   mutation: CreatePaymentMutation;
   receipt: File | null;
   mutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
-  upload: (target: { paymentId: string }, file: File) => Promise<void>;
+  upload: (target: { paymentId: string }, file: File, options?: { notifySuccess?: boolean }) => Promise<void>;
   onPaymentCreated?: (snapshot: WorkspaceSnapshot) => void;
 }): Promise<WorkspaceMutationResult> {
   const result = await mutate(mutation);
@@ -33,6 +33,6 @@ export async function createPaymentWithOptionalReceipt({
     );
   }
 
-  await upload({ paymentId: result.createdPaymentId }, receipt);
+  await upload({ paymentId: result.createdPaymentId }, receipt, { notifySuccess: false });
   return result;
 }

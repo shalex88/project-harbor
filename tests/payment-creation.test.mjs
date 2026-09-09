@@ -48,8 +48,8 @@ test("a new payment uploads its selected receipt against the created payment", a
     onPaymentCreated: (createdSnapshot) => {
       events.push(["created", createdSnapshot]);
     },
-    upload: async (target, receivedReceipt) => {
-      events.push(["upload", target, receivedReceipt]);
+    upload: async (target, receivedReceipt, options) => {
+      events.push(["upload", target, receivedReceipt, options]);
     },
   });
 
@@ -57,7 +57,7 @@ test("a new payment uploads its selected receipt against the created payment", a
   assert.deepEqual(events, [
     ["mutate", mutation],
     ["created", snapshot],
-    ["upload", { paymentId: "payment-new" }, receipt],
+    ["upload", { paymentId: "payment-new" }, receipt, { notifySuccess: false }],
   ]);
 });
 

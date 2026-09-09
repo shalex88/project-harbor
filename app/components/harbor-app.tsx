@@ -250,6 +250,7 @@ export function HarborApp({
   const upload = async (
     target: { itemId?: string; paymentId?: string },
     file: File,
+    options?: { notifySuccess?: boolean },
   ) => {
     setPending(true);
     try {
@@ -259,7 +260,9 @@ export function HarborApp({
         onProgress: setUploadProgress,
       });
       acceptSnapshot(next);
-      pushToast(target.paymentId ? "Receipt uploaded" : "File uploaded");
+      if (options?.notifySuccess !== false) {
+        pushToast(target.paymentId ? "Receipt uploaded" : "File uploaded");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
       pushToast(message, "error");
