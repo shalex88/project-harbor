@@ -219,7 +219,7 @@ export function HarborApp({
 
   const mutate = async (
     mutation: WorkspaceMutation,
-  ): Promise<WorkspaceSnapshot> => {
+  ): Promise<WorkspaceMutationResult> => {
     setPending(true);
     try {
       const result = await readMutationResponse(
@@ -236,7 +236,7 @@ export function HarborApp({
       );
       if (createdItemMode) setItemMode(createdItemMode);
       pushToast(successMessage(mutation));
-      return result.snapshot;
+      return result;
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to save changes";
@@ -250,6 +250,7 @@ export function HarborApp({
   const upload = async (
     target: { itemId?: string; paymentId?: string },
     file: File,
+    options?: { notifySuccess?: boolean },
   ) => {
     setPending(true);
     try {
@@ -259,7 +260,9 @@ export function HarborApp({
         onProgress: setUploadProgress,
       });
       acceptSnapshot(next);
-      pushToast(target.paymentId ? "Receipt uploaded" : "File uploaded");
+      if (options?.notifySuccess !== false) {
+        pushToast(target.paymentId ? "Receipt uploaded" : "File uploaded");
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Upload failed";
       pushToast(message, "error");
@@ -608,12 +611,13 @@ export function HarborApp({
       snapshot.projects.map((project) => project.id),
     );
     const data = new FormData(event.currentTarget);
-    const next = await mutate({
+    const result = await mutate({
       action: "create_project",
       name: String(data.get("name") ?? ""),
       description: String(data.get("description") ?? ""),
       currency: String(data.get("currency") ?? "USD"),
     });
+    const next = result.snapshot;
     const created = next.projects.find(
       (project) => !previousProjectIds.has(project.id),
     );

@@ -9,6 +9,7 @@ import {
   type PaymentRecord,
   type WorkItemRecord,
   type WorkspaceMutation,
+  type WorkspaceMutationResult,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import {
@@ -24,6 +25,7 @@ import {
   confirmReceiptDeletion,
   getReceiptAction,
 } from "@/lib/payment-receipt-actions";
+import { createPaymentWithOptionalReceipt } from "@/lib/payment-creation";
 import { EmptyState, Field, Modal, Sheet, SubmitForm } from "./ui";
 import { ItemRelationsPanel } from "./item-relations";
 import { ContactMentionEditor } from "./contact-mention-editor";
@@ -78,14 +80,14 @@ export function ItemSheet({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (
     sourceItemId: string,
     collectionId: string,
     type: "task" | "event",
   ) => void;
-  onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onUpload: (target: FileTarget, file: File, options?: { notifySuccess?: boolean }) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
@@ -145,14 +147,14 @@ function ItemSheetContent({
   pending: boolean;
   uploadProgress: number | null;
   onClose: () => void;
-  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   onOpenItem: (itemId: string) => void;
   onStartFollowUp: (
     sourceItemId: string,
     collectionId: string,
     type: "task" | "event",
   ) => void;
-  onUpload: (target: FileTarget, file: File) => Promise<void>;
+  onUpload: (target: FileTarget, file: File, options?: { notifySuccess?: boolean }) => Promise<void>;
   onRenameFile: (fileObjectId: string, baseName: string) => Promise<void>;
   onDeleteFile: (fileObjectId: string) => Promise<void>;
 }) {
@@ -328,13 +330,35 @@ function ItemSheetContent({
         paidOn: String(data.get("paidOn") ?? ""),
         note: String(data.get("note") ?? ""),
       };
-      await onMutate(
-        editingPayment
-          ? { action: "update_payment", paymentId: editingPayment.id, ...common }
-          : { action: "create_payment", itemId: item.id, ...common },
-      );
-      setEditingPayment(null);
-      form.reset();
+      if (editingPayment) {
+        await onMutate({
+          action: "update_payment",
+          paymentId: editingPayment.id,
+          ...common,
+        });
+        setEditingPayment(null);
+        form.reset();
+      } else {
+        const receiptEntry = data.get("receipt");
+        const receipt =
+          receiptEntry instanceof File && receiptEntry.size > 0
+            ? receiptEntry
+            : null;
+        await createPaymentWithOptionalReceipt({
+          mutation: {
+            action: "create_payment",
+            itemId: item.id,
+            ...common,
+          },
+          receipt,
+          mutate: onMutate,
+          upload: onUpload,
+          onPaymentCreated: () => {
+            setEditingPayment(null);
+            form.reset();
+          },
+        });
+      }
     } catch (error) {
       setLocalError(error instanceof Error ? error.message : "Unable to save the payment");
     }
@@ -713,6 +737,16 @@ function ItemSheetContent({
               <Field label="Payment date"><input key={`date-${editingPayment?.id ?? "new"}`} name="paidOn" type="date" required defaultValue={editingPayment?.paidOn ?? new Date().toISOString().slice(0, 10)} /></Field>
             </div>
             <Field label="Note" hint="Optional"><input key={`note-${editingPayment?.id ?? "new"}`} name="note" defaultValue={editingPayment?.note ?? ""} maxLength={500} placeholder="What was paid for?" /></Field>
+            {!editingPayment ? (
+              <Field label="Receipt" hint="Optional · image or PDF">
+                <input
+                  name="receipt"
+                  type="file"
+                  accept="image/*,application/pdf"
+                  capture="environment"
+                />
+              </Field>
+            ) : null}
             <button className="button button-primary" type="submit" disabled={pending}>{pending ? "Saving…" : editingPayment ? "Save payment" : "Add payment"}</button>
           </SubmitForm>
         </section>

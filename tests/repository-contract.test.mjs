@@ -52,7 +52,8 @@ test("relation endpoints are authorized before project details are compared", ()
 
 test("follow-up responses identify the item created by the mutation", () => {
   assert.match(repository, /createdItemId = itemId/);
-  assert.match(repository, /return \{ snapshot: await loadWorkspaceSnapshot\(identity\), createdItemId \}/);
+  assert.match(repository, /createdPaymentId = paymentId/);
+  assert.match(repository, /createdItemId,[\s\S]*createdPaymentId,/);
 });
 
 test("follow-up creation authorizes generic source and collection before comparing projects", () => {

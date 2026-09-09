@@ -5,6 +5,7 @@ import {
   type WorkItemRecord,
   type WorkItemRelationRecord,
   type WorkspaceMutation,
+  type WorkspaceMutationResult,
   type WorkspaceSnapshot,
 } from "@/lib/domain";
 import {
@@ -45,7 +46,7 @@ export function ItemRelationsPanel({
   snapshot: WorkspaceSnapshot;
   item: WorkItemRecord;
   pending: boolean;
-  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceSnapshot>;
+  onMutate: (mutation: WorkspaceMutation) => Promise<WorkspaceMutationResult>;
   onOpenItem: (itemId: string) => void;
   onError: (message: string) => void;
 }) {

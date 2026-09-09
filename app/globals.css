@@ -2505,6 +2505,14 @@ strong.work-item-title {
   justify-self: end;
 }
 
+.payment-form input[type="file"] {
+  padding: 9px 10px;
+}
+
+.payment-form input[type="file"]::file-selector-button {
+  margin-right: 10px;
+}
+
 .entry-screen {
   display: grid;
   min-height: 100vh;
